@@ -161,7 +161,22 @@
     const path = getPath(state.category, l3Id);           // [L1, L2, L3]
     const catPath = [cat ? cat.name : '', path[0] ? path[0].name : '', path[1] ? path[1].name : '', path[2] ? path[2].name : '']
       .filter(Boolean).join('>');
-    return `${region} 分类:${catPath} 品牌排行榜 爆品`;
+    const l3Name = path[2] ? path[2].name : (path[1] ? path[1].name : '');
+    // 强制平台后缀 + 引号锁定核心词，示例：
+    // "海口市" "足道采耳" 美团 大众点评 抖音 热门商家 真实店名 分类:服务>...>足道采耳
+    return `"${region}" "${l3Name}" 美团 大众点评 抖音 热门商家 真实店名 分类:${catPath}`;
+  }
+
+  // 前端兜底：拦截后端漏网的占位符/假数据
+  const FAKE_RE = /(XX|YY|ZZ|ABC|某某|品牌名|示例|测试|店名|占位|待补充|unknown|placeholder|example|N\/A)/i;
+  function isFakeBrand(b) {
+    if (!b) return true;
+    const name = String(b.brandName || b.name || '').trim();
+    if (name.length < 2 || FAKE_RE.test(name)) return true;
+    if (FAKE_RE.test(String(b.hotItem || b.signboard || ''))) return true;
+    const p = parseFloat(String(b.avgPrice == null ? '' : b.avgPrice).replace(/[^\d.]/g, ''));
+    if (!(p > 0)) return true;
+    return false;
   }
 
   // 防 XSS：联网返回的数据不可信，渲染前先转义
@@ -205,7 +220,9 @@
       const data = await res.json();
       const arr = Array.isArray(data) ? data : (data.brands || data.data || data.results || []);
       if (!Array.isArray(arr) || !arr.length) return null;
-      return arr.map(normLiveBrand).slice(0, 8);
+      const clean = arr.filter(b => !isFakeBrand(b)).map(normLiveBrand).slice(0, 8);
+      if (!clean.length) return null;         // 全是假数据 → 触发降级，不展示脏数据
+      return clean;
     } catch (e) {
       return null;                          // 网络 / 解析失败 → 触发降级
     } finally {
