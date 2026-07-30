@@ -20,3 +20,9 @@ Thumbs.db
 __pycache__/
 *.pyc
 .env
+
+# Cloudflare / Vercel 构建产物与本地配置
+.wrangler/
+.vercel/
+.dev.vars
+

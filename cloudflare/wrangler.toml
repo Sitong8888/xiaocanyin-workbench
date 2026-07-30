@@ -1,0 +1,11 @@
+name = "xiaocan-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# ⚠️ 不要在此文件写入任何密钥！
+# 用以下命令把 DeepSeek Key 设为 secret（仅存于 Cloudflare，不进仓库）：
+#   npx wrangler secret put DEEPSEEK_API_KEY
+#
+# 可选：若要真正实时联网搜索（更贴近真实数据），再设置：
+#   npx wrangler secret put SEARCH_API_KEY
+#   npx wrangler secret put SEARCH_PROVIDER   # 取值：serpapi 或 tavily

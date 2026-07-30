@@ -8,8 +8,12 @@
  *    必须只存放在后端代理的环境变量里（切勿写入前端）。
  * ========================================================================= */
 window.APP_CONFIG = {
-  // 你的后端代理地址，例如 "https://your-proxy.vercel.app/api/brands"
-  // 留空（""）则前端使用基准数据，不联网。
+  // 你的后端代理地址（Cloudflare Worker 或 Vercel，详见仓库 cloudflare/ 与 vercel/ 目录）。
+  // 留空（""）则前端使用基准数据，不联网（安全默认）。
+  // —— 部署后端代理后，把得到的地址填到下面（例如）：
+  //      Cloudflare: "https://xiaocan-proxy.<你的子域>.workers.dev"
+  //      Vercel:     "https://<你的>.vercel.app/api/brands"
+  // 地址末尾带不带 "/api/brands" 均可，前端会自动拼接 ?q=。
   liveApiBase: "",
 
   // 可选：若你的代理需要简单鉴权（建议用一次性/低权限 key）
