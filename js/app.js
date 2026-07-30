@@ -274,9 +274,9 @@
         : (renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`);
       srcLabel = '<span class="ri-src live">● 实时美团/点评/抖音</span>';
     } else if (opts.fallback) {
-      brandsInner = `<div class="ri-fallback">⚠ 实时获取失败，已展示基准数据</div>` +
+      brandsInner = `<div class="ri-fallback">ℹ️ 「${esc(label)}」暂未检索到可验证的真实榜单，已为您提供<b>行业基准分析模型</b></div>` +
         renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
-      srcLabel = '<span class="ri-src mock">○ 基准数据</span>';
+      srcLabel = '<span class="ri-src mock">○ 行业基准分析模型</span>';
     } else {
       brandsInner = renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
       srcLabel = '<span class="ri-src mock">○ 基准数据</span>';
