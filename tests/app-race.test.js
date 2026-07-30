@@ -54,8 +54,13 @@ async function boot(responder) {
     });
   };
 
-  // data.js 与 app.js 必须在同一次 eval 中执行：const 声明不会挂到 window 上
-  window.eval(read('js/data.js') + '\n;\n' + read('js/app.js'));
+  // 所有前端模块必须在同一次 eval 中执行：经典 <script> 顶层 const 不挂 window，
+  // 分开 eval 会因作用域隔离而找不到跨文件依赖。顺序须与 index.html 一致。
+  const FRONTEND = [
+    'js/config.js', 'js/data.js', 'js/core.js', 'js/live.js',
+    'js/render.js', 'js/insight.js', 'js/interactions.js', 'js/app.js',
+  ];
+  window.eval(FRONTEND.map(f => read(f)).join('\n;\n'));
   window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
   await new Promise(r => setTimeout(r, 0));
 

@@ -28,6 +28,32 @@ const APP_GLOBALS = {
   module: 'writable', require: 'readonly', process: 'readonly',
 };
 
+// 前端多文件经典 <script> 共享全局词法作用域（无打包器）：各模块顶层函数互相引用，
+// 需在 ESLint 中显式声明为全局，否则 no-undef 会把"跨文件调用"误判为未定义。
+// 同步新增共享函数时请在此登记，保持 no-undef 的保护力。
+const JS_MODULE_API = {
+  // core.js
+  '$': 'readonly', '$$': 'readonly', state: 'readonly', fmt: 'readonly',
+  oceanText: 'readonly', oceanClass: 'readonly', getSel: 'readonly', primaryL3: 'readonly',
+  esc: 'readonly', APP_CONFIG: 'readonly', LIVE_TIMEOUT: 'readonly',
+  liveViewKey: 'readonly', liveAbort: 'writable',
+  // live.js
+  buildLiveQuery: 'readonly', FAKE_RE: 'readonly', isFakeBrand: 'readonly',
+  normLiveBrand: 'readonly', tagClass: 'readonly', fetchLiveBrands: 'readonly',
+  // render.js（看板/图表）
+  renderCategorySelect: 'readonly', gapChip: 'readonly', renderCascader: 'readonly',
+  updatePath: 'readonly', maybeRender: 'readonly', renderKPI: 'readonly',
+  renderRadar: 'readonly', renderMatrix: 'readonly', renderLine: 'readonly',
+  // insight.js（区域洞察/战略/抽屉）
+  renderRegionPanel: 'readonly', regionLabel: 'readonly', renderRegionEff: 'readonly',
+  closeRegionPanel: 'readonly', renderMockBrands: 'readonly', renderMockProducts: 'readonly',
+  renderLiveBrands: 'readonly', regionInsightShell: 'readonly', refreshRegionInsight: 'readonly',
+  strategyBlock: 'readonly', renderStrategy: 'readonly', diffInsight: 'readonly',
+  openDrawer: 'readonly', closeDrawer: 'readonly',
+  // interactions.js
+  setCategory: 'readonly', bindEvents: 'readonly', initDefault: 'readonly', boot: 'readonly',
+};
+
 /** 通用质量规则：全项目一致 */
 const CORE_RULES = {
   // —— 正确性（error：合并前必须清零）——
@@ -76,9 +102,11 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
-      globals: { ...RUNTIME_GLOBALS, ...APP_GLOBALS },
+      globals: { ...RUNTIME_GLOBALS, ...APP_GLOBALS, ...JS_MODULE_API },
     },
-    rules: CORE_RULES,
+    // 多文件经典 <script> 共享全局作用域：顶层函数被其它文件引用属正常"导出"，
+    // 故 no-unused-vars 仅查函数内局部变量（vars:'local'），避免误报。
+    rules: { ...CORE_RULES, 'no-unused-vars': ['error', { args: 'none', vars: 'local', varsIgnorePattern: '^_' }] },
   },
 
   // 边缘/无服务端函数与测试：ESM

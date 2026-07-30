@@ -9,12 +9,14 @@
     "test:watch": "node --test --watch \"tests/**/*.test.js\"",
     "lint": "eslint js cloudflare/worker.js vercel/api tests",
     "lint:fix": "eslint --fix js cloudflare/worker.js vercel/api tests",
-    "check": "node --check js/app.js && node --check js/data.js && node --check js/config.js",
+    "check": "node --check js/config.js && node --check js/data.js && node --check js/core.js && node --check js/live.js && node --check js/render.js && node --check js/insight.js && node --check js/interactions.js && node --check js/app.js",
     "verify": "npm run check && npm run lint && npm test",
-    "deploy:worker": "wrangler deploy --config cloudflare/wrangler.toml"
+    "deploy:worker": "wrangler deploy --config cloudflare/wrangler.toml",
+    "prepare": "husky"
   },
   "devDependencies": {
     "eslint": "^9.14.0",
+    "husky": "^9.1.7",
     "jsdom": "^25.0.1"
   },
   "engines": {
