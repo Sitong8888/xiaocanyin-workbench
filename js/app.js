@@ -148,17 +148,20 @@
   const APP_CONFIG = (window.APP_CONFIG && typeof window.APP_CONFIG === 'object') ? window.APP_CONFIG : {};
   const LIVE_TIMEOUT = APP_CONFIG.liveApiTimeout || 6000;
 
+  // 检索词构造器：对齐美团/大众点评/抖音分类标准，输出完整分类路径（负向过滤靠后端硬规则）
+  // 格式：[省/市/区] 分类:[行业大类]>[一级赛道]>[二级品类]>[三级细分] 品牌排行榜 爆品
+  // 示例：广东省 深圳市 南山区 分类:餐饮>小吃快餐>特色粉面>螺蛳粉 品牌排行榜 爆品
   function buildLiveQuery() {
     const r = state.region;
     if (!r.prov) return null;
     const l3Id = primaryL3();
     if (!l3Id) return null;
-    const l3Name = getNode(state.category, l3Id).name;
-    const parts = [r.prov.name];
-    if (r.city) parts.push(r.city.name);
-    if (r.dist) parts.push(r.dist);
-    parts.push(l3Name, '美团', '大众点评', '热门品牌', '招牌爆品', '排行榜');
-    return parts.join(' ');
+    const region = [r.prov.name, r.city ? r.city.name : '', r.dist || ''].filter(Boolean).join('');
+    const cat = CATEGORIES.find(c => c.id === state.category);
+    const path = getPath(state.category, l3Id);           // [L1, L2, L3]
+    const catPath = [cat ? cat.name : '', path[0] ? path[0].name : '', path[1] ? path[1].name : '', path[2] ? path[2].name : '']
+      .filter(Boolean).join('>');
+    return `${region} 分类:${catPath} 品牌排行榜 爆品`;
   }
 
   // 防 XSS：联网返回的数据不可信，渲染前先转义
@@ -180,6 +183,7 @@
       avgPrice: avgPrice,
       rating: rating,
       tag: tag,
+      douyinRank: String(b.douyinRank || '').trim(),   // 🎵 抖音本地生活榜单（如：抖音同城热销榜 Top2）
     };
   }
   function tagClass(tag) {
@@ -225,14 +229,19 @@
       </div>`).join('');
   }
   function renderLiveBrands(live) {
-    return live.map(b => `
+    return live.map(b => {
+      const dy = b.douyinRank
+        ? `<i class="rb-douyin">${b.douyinRank.indexOf('🎵') === 0 ? '' : '🎵 '}${esc(b.douyinRank)}</i>`
+        : '';
+      return `
       <div class="rb-item live">
         <div class="rb-top">
-          <span class="rb-name">${esc(b.brandName)} <i class="rb-tag ${tagClass(b.tag)}">${esc(b.tag)}</i></span>
+          <span class="rb-name">${esc(b.brandName)} <i class="rb-tag ${tagClass(b.tag)}">${esc(b.tag)}</i>${dy}</span>
           <span class="rb-rating">★ ${b.rating}</span>
         </div>
         <div class="rb-meta">招牌爆品：${esc(b.hotItem) || '—'} ｜ 人均 ¥${b.avgPrice}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function regionInsightShell(ins, opts) {
@@ -240,13 +249,13 @@
     const label = regionLabel() || '全国';
     let brandsInner, srcLabel;
     if (opts.loading) {
-      brandsInner = `<div class="ri-loading"><span class="spinner"></span> 正在实时抓取「${esc(label)}」美团 / 大众点评数据…</div>`;
+      brandsInner = `<div class="ri-loading"><span class="spinner"></span> 正在实时抓取「${esc(label)}」美团 / 大众点评 / 抖音数据…</div>`;
       srcLabel = '<span class="ri-src loading">● 实时抓取中</span>';
     } else if (opts.live) {
       brandsInner = opts.live.length
         ? renderLiveBrands(opts.live)
         : (renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`);
-      srcLabel = '<span class="ri-src live">● 实时美团/点评</span>';
+      srcLabel = '<span class="ri-src live">● 实时美团/点评/抖音</span>';
     } else if (opts.fallback) {
       brandsInner = `<div class="ri-fallback">⚠ 实时获取失败，已展示基准数据</div>` +
         renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
@@ -258,7 +267,7 @@
     return `
       <div class="ri-head">
         <span class="ri-title">🌐 ${esc(ins.regionName)} · ${esc(getNode(state.category, primaryL3()).name)} · 区域动态洞察</span>
-        <span class="ri-query">检索词：<code>${esc(ins.query)}</code></span>
+        <span class="ri-query">检索词：<code>${esc(buildLiveQuery() || ins.query)}</code></span>
       </div>
       <div class="ri-chips">
         <span class="ri-chip heat">市场热度 <b>${ins.heat}</b>/100</span>
@@ -272,10 +281,16 @@
           <div id="riBrands">${brandsInner}</div>
         </div>
         <div class="ri-col">
-          <div class="ri-sub">🎯 本地化战略空位（顾均辉空位表）</div>
-          <div class="ri-cell"><div class="ri-t">😣 本地人群痛点</div><div class="ri-b">${esc(ins.localPain)}</div></div>
-          <div class="ri-cell"><div class="ri-t">⚠️ 竞品本地弱点</div><div class="ri-b">${esc(ins.localWeak)}</div></div>
-          <div class="ri-gap">🎯 本地化切入点（核心结论）<div class="sg-text">${esc(ins.localGap)} <span class="gap-tag ${'gt-' + GAP_TYPES.indexOf(ins.gapType)}">${GAP_ICON[ins.gapType] || ''} ${esc(ins.gapType)}</span></div></div>
+          <div class="ri-sub">🎯 本地化战略空位（特劳特《定位》× 顾均辉 · 4 大心智指标）
+            <span class="pos-badge ${'gt-' + GAP_TYPES.indexOf(ins.positionType || ins.gapType)}">${GAP_ICON[ins.positionType || ins.gapType] || ''} ${esc(ins.positionType || ins.gapType)}</span>
+          </div>
+          <div class="ri-cell"><div class="ri-t">😣 本地客户心智痛点</div><div class="ri-b">${esc(ins.mindPain || ins.localPain)}</div></div>
+          <div class="ri-cell"><div class="ri-t">⚠️ 竞品固有弱点（对立面）</div><div class="ri-b">${esc(ins.rivalWeak || ins.localWeak)}</div></div>
+          <div class="ri-nail">🏆 心智空位结论<div class="sg-text">${esc(ins.mindNail || ins.localGap)}</div></div>
+          <div class="ri-sub" style="margin-top:10px">🚀 本地化切入点（3 大战术指令）</div>
+          <div class="ri-tactic th"><div class="ri-t">🔨 爆品与视觉锤战术</div><div class="ri-b">${esc(ins.tacticHammer || '')}</div></div>
+          <div class="ri-tactic tt"><div class="ri-t">📱 美团/抖音流量攻占</div><div class="ri-b">${esc(ins.tacticTraffic || '')}</div></div>
+          <div class="ri-tactic tr"><div class="ri-t">🛡️ 本地信任状建立</div><div class="ri-b">${esc(ins.tacticTrust || '')}</div></div>
         </div>
       </div>`;
   }
@@ -518,15 +533,25 @@
     const regionNote = state.region.prov
       ? `<div class="strat-region">📍 区域提示：在 <b>${regionLabel()}</b> 切入「${s.gapType}」空位，可叠加标签 ${getRegionProf(state.region.prov.id).tags.map(t => '#' + t).join(' ')}</div>`
       : '';
+    const nail = s.mindNail
+      ? `<div class="strat-nail">🏆 心智空位结论（特劳特定位钉子）<div class="sg-text">${s.mindNail}</div></div>` : '';
+    const tactics = s.tactics
+      ? `<div class="strat-tactics">
+           <div class="ri-tactic th"><div class="ri-t">🔨 爆品与视觉锤战术</div><div class="ri-b">${s.tactics.hammer}</div></div>
+           <div class="ri-tactic tt"><div class="ri-t">📱 美团/抖音流量攻占</div><div class="ri-b">${s.tactics.traffic}</div></div>
+           <div class="ri-tactic tr"><div class="ri-t">🛡️ 本地信任状建立</div><div class="ri-b">${s.tactics.trust}</div></div>
+         </div>` : '';
     return `
       <div class="strat-head"><span class="badge ${role === 'A' ? 'badge-a' : 'badge-b'}">${role === 'A' ? '主对象 A' : '对比 B'}</span> ${path}
-        ${gapChip(s.gapType)}</div>
+        ${gapChip(s.positionType || s.gapType)}</div>
       <div class="strat-grid">
         <div class="strat-cell"><div class="sc-t">🥊 核心竞争对手 / 占据心智</div><div class="sc-b">${s.competitors.map(c => `<div class="comp"><b>${c.name}</b>：${c.mind}</div>`).join('')}</div></div>
-        <div class="strat-cell"><div class="sc-t">😣 客户未被满足的痛点</div><div class="sc-b">${s.painPoints.map(p => `<div class="pain">• ${p}</div>`).join('')}</div></div>
-        <div class="strat-cell"><div class="sc-t">⚠️ 竞品固有弱点</div><div class="sc-b">${s.weaknesses.map(w => `<div class="weak">• ${w}</div>`).join('')}</div></div>
+        <div class="strat-cell"><div class="sc-t">😣 客户心智痛点</div><div class="sc-b">${s.painPoints.map(p => `<div class="pain">• ${p}</div>`).join('')}</div></div>
+        <div class="strat-cell"><div class="sc-t">⚠️ 竞品固有弱点（对立面）</div><div class="sc-b">${s.weaknesses.map(w => `<div class="weak">• ${w}</div>`).join('')}</div></div>
       </div>
       <div class="strat-gap">🎯 战略空位与切入点（核心结论）<div class="sg-text">${s.gap}</div></div>
+      ${nail}
+      ${tactics}
       ${regionNote}`;
   }
 

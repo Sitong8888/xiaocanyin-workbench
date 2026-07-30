@@ -170,7 +170,8 @@ body {
 .strat-gap { margin-top: 10px; background: linear-gradient(135deg,#fff7ed,#fef2f2); border: 1px solid #fed7aa; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 700; }
 .sg-text { font-weight: 500; color: #9a3412; margin-top: 4px; }
 .gap-tag { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 999px; color: #fff; margin-left: 4px; }
-.gt-0 { background: #3b82f6; } .gt-1 { background: #f59e0b; } .gt-2 { background: #10b981; } .gt-3 { background: #8b5cf6; }
+/* 特劳特定位类型 Badge：对立定位 | 价格空位 | 人群空位 | 场景空位 | 特性空位 */
+.gt-0 { background: #dc2626; } .gt-1 { background: #f59e0b; } .gt-2 { background: #10b981; } .gt-3 { background: #3b82f6; } .gt-4 { background: #8b5cf6; }
 .strat-region { margin-top: 8px; font-size: 11px; color: var(--ink-2); background: #eef5ff; border-radius: 8px; padding: 6px 9px; }
 .cmp-grid { display: grid; gap: 12px; }
 .diff-insight { margin-top: 10px; background: #eef6ff; border: 1px solid #cfe2ff; border-radius: 10px; padding: 9px 11px; font-size: 12px; color: #1e40af; }
@@ -270,4 +271,33 @@ body {
   .ri-body { grid-template-columns: 1fr 1fr; }
   .kpi-card { flex: 0 0 22%; }
   .cascader-panel.open, .region-panel.open { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* =========================================================================
+ * v2 升级：特劳特定位面板 + 抖音本地生活 Badge
+ * ========================================================================= */
+/* 定位类型 Badge（区域洞察标题内） */
+.pos-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; color: #fff; margin-left: 6px; vertical-align: middle; }
+
+/* 🏆 心智空位结论（特劳特定位钉子） */
+.ri-nail, .strat-nail { margin-top: 6px; background: linear-gradient(135deg,#fefce8,#fff7ed); border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 800; color: #92400e; }
+.ri-nail .sg-text, .strat-nail .sg-text { font-weight: 600; color: #b45309; margin-top: 5px; font-size: 12.5px; }
+.strat-nail { margin-top: 10px; }
+
+/* 🚀 3 大战术指令卡（🔨视觉锤 / 📱流量攻占 / 🛡️信任状） */
+.ri-tactic { border-radius: 10px; padding: 8px 10px; margin-bottom: 7px; border: 1px solid var(--line); background: #f8fafc; }
+.ri-tactic .ri-t { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+.ri-tactic .ri-b { font-size: 11.5px; color: #374151; line-height: 1.55; }
+.ri-tactic.th { background: #fff1f2; border-color: #fecdd3; } .ri-tactic.th .ri-t { color: #be123c; }
+.ri-tactic.tt { background: #eff6ff; border-color: #bfdbfe; } .ri-tactic.tt .ri-t { color: #1d4ed8; }
+.ri-tactic.tr { background: #ecfdf5; border-color: #a7f3d0; } .ri-tactic.tr .ri-t { color: #047857; }
+.strat-tactics { margin-top: 10px; display: grid; gap: 0; }
+
+/* 🎵 抖音本地生活榜单 Badge：黑底 + 抖音红/青双色描边 */
+.rb-douyin {
+  display: inline-block; font-size: 10px; font-weight: 700; font-style: normal;
+  color: #fff; background: #161823; padding: 1px 8px; border-radius: 999px; margin-left: 5px;
+  border: 1px solid #fe2c55;
+  box-shadow: 0 0 0 1px rgba(37,244,238,.45), 0 1px 4px rgba(254,44,85,.35);
+  white-space: nowrap; vertical-align: middle;
 }

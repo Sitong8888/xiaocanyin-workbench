@@ -606,8 +606,8 @@ const REGION_PROFILE = {
 /* ---------- 海洋 / 空位 类型 ---------- */
 const OCEAN_TEXT  = { blue: '蓝海', high: '高潜', red: '红海', stable: '平稳' };
 const OCEAN_CLASS = { blue: 'o-blue', high: 'o-high', red: 'o-red', stable: 'o-stable' };
-const GAP_TYPES = ['人群空位', '价格空位', '场景空位', '特性空位'];
-const GAP_ICON  = { '人群空位': '👥', '价格空位': '💰', '场景空位': '🕒', '特性空位': '✨' };
+const GAP_TYPES = ['对立定位', '价格空位', '人群空位', '场景空位', '特性空位'];
+const GAP_ICON  = { '对立定位': '⚔️', '价格空位': '💰', '人群空位': '👥', '场景空位': '🕒', '特性空位': '✨' };
 
 /* =========================================================================
  * 确定性伪随机（保证刷新数据稳定）
@@ -747,6 +747,118 @@ const CAT_BANKS = {
     scene: ['创业起步', '税务稽查季', '融资前梳理', '年终汇算'],
     feat: ['业财一体化', '风险预警', '专属顾问'],
   },
+};
+
+/* =========================================================================
+ * 特劳特《定位》× 顾均辉模型 · 对立面竞品库
+ *  按「三级赛道名关键词」匹配区域头部品牌及其因既有定位而无法兼顾的固有弱点，
+ *  用于生成：⚠️ 竞品固有弱点（对立面） + 🏆 心智空位结论（定位钉子）。
+ * ========================================================================= */
+const RIVALS = {
+  catering: [
+    { m: /咖|拿铁|冷萃|美式|气泡咖/, list: [
+      { name: '星巴克', weak: '客单虚高（35元+），第三空间定位使其无法兼顾日常高频平价消费' },
+      { name: '瑞幸', weak: '快取店规模化定位，牺牲了精品风味、现场烘焙与体验感' }] },
+    { m: /鲜果茶|轻乳茶|奶茶|柠檬茶|纯茶|果汁|糖水|刨冰|绵绵冰|杨枝甘露|生椰乳/, list: [
+      { name: '喜茶', weak: '高端灵感定位，20元+价格带无法兼顾下沉高频复购' },
+      { name: '蜜雪冰城', weak: '极致低价心智已被钉死，无法向上兼顾鲜果品质与健康感' }] },
+    { m: /火锅|串串|麻辣烫|椰子鸡|打边炉|猪肚鸡|冒菜/, list: [
+      { name: '海底捞', weak: '服务溢价定位推高客单（人均100+），等位久、家庭日常化消费受阻' },
+      { name: '呷哺呷哺', weak: '标准化央厨锅底，缺地道锅气与在地风味' }] },
+    { m: /粉|面|米线|拉面/, list: [
+      { name: '和府捞面', weak: '书房场景高端面定位，40元+客单脱离刚需快餐主流价格带' },
+      { name: '连锁米粉品牌', weak: '料包复热标准化，丢失现熬汤底与地道口感心智' }] },
+    { m: /炸鸡|鸡排|炸串|钵钵鸡/, list: [
+      { name: '肯德基', weak: '西式标准化定位，无法兼顾现腌现炸的中式锅气与街头烟火气' },
+      { name: '正新鸡排', weak: '10元低价大排心智，品质与健康升级空间被自身定位锁死' }] },
+    { m: /卤|鸭货|凉拌/, list: [
+      { name: '绝味鸭脖', weak: '工厂预卤配送定位，无法兼顾「现捞热卤」的新鲜心智' },
+      { name: '紫燕百味鸡', weak: '佐餐家庭定位，错失年轻人即食零食化场景' }] },
+    { m: /烘焙|蛋糕|甜品|糕点|可颂|泡芙|桃酥|蛋黄酥|舒芙蕾/, list: [
+      { name: '好利来', weak: '高端联名定位，价格带上移后让出平价日常烘焙心智' },
+      { name: '桃李面包', weak: '工业化长保定位，无法兼顾「现烤出炉」的新鲜心智' }] },
+    { m: /快餐|烧腊|黄焖鸡|煲仔饭|木桶饭|现炒/, list: [
+      { name: '老乡鸡', weak: '全国标准化定位，菜单趋同，无法兼顾在地口味偏好' },
+      { name: '乡村基', weak: '大店模型成本高，社区小店快取场景渗透不足' }] },
+    { m: /./, list: [
+      { name: '头部连锁品牌', weak: '规模化标准化定位，牺牲了个性化与在地口味' },
+      { name: '本地老字号', weak: '正宗情怀定位，环境陈旧、年轻化表达弱' }] },
+  ],
+  health: [
+    { m: /健身|团课|私教|普拉提|瑜伽|拳击|滑雪|攀岩|球/, list: [
+      { name: '连锁大健身房', weak: '年卡预付定位，重销售轻服务，办卡跑路信任危机' },
+      { name: '超级猩猩', weak: '一线城市团课定位，下沉市场与私教深度服务缺位' }] },
+    { m: /推拿|正骨|艾灸|拔罐|刮痧|膏方|头疗|采耳|SPA|按摩|指压|足道/, list: [
+      { name: '连锁养生馆', weak: '办卡推销定位，体验被销售话术破坏，价格不透明' },
+      { name: '老字号中医馆', weak: '名医挂号定位，排队久、年轻客群触达弱' }] },
+    { m: /./, list: [
+      { name: '头部连锁品牌', weak: '重资产扩张定位，服务标准化不足、下沉薄弱' },
+      { name: '平台型玩家', weak: '流量撮合定位，无法兼顾服务交付质量' }] },
+  ],
+  service: [
+    { m: /美甲|美睫|护理|美肤|抗衰|祛痘|纹眉|造型|新娘/, list: [
+      { name: '连锁美业大店', weak: '高客单套卡定位，推销重、隐形消费多' },
+      { name: '平台低价团购店', weak: '9.9元引流定位，到店升单、品质心智已损' }] },
+    { m: /保洁|清洗|消毒|干洗|收纳|除螨/, list: [
+      { name: '58到家', weak: '平台撮合定位，阿姨水平参差、服务不可控' },
+      { name: '天鹅到家', weak: '高端管家定位，价格高企，日常单次刚需被忽略' }] },
+    { m: /宠物|猫|狗/, list: [
+      { name: '连锁宠物医院', weak: '医疗高价定位，洗护美容体验感与性价比弱' },
+      { name: '平台电商', weak: '卖货定位，无法兼顾线下即时服务与情感连接' }] },
+    { m: /./, list: [
+      { name: '平台型巨头', weak: '流量抽佣定位，服务质量不可控、售后无门' },
+      { name: '夫妻老婆店', weak: '低价生存定位，无标准、无保障、无品牌' }] },
+  ],
+  education: [
+    { m: /./, list: [
+      { name: '头部连锁机构', weak: '规模化名师定位，频繁换老师、个性化关注不足' },
+      { name: '在线大平台', weak: '低价录播定位，无法兼顾陪伴感与效果外化' }] },
+  ],
+  training: [
+    { m: /./, list: [
+      { name: '大厂背景机构', weak: '高价名企就业定位，课程更新慢、交付注水' },
+      { name: '在线课程平台', weak: '低价海量课定位，完课率低、无就业陪跑' }] },
+  ],
+  design: [
+    { m: /./, list: [
+      { name: '4A/大牌设计公司', weak: '品牌溢价定位，报价高、周期长，小单不接' },
+      { name: '低价接单平台', weak: '比价内卷定位，模板化交付、无法兼顾落地施工' }] },
+  ],
+  medical: [
+    { m: /./, list: [
+      { name: '连锁专科巨头', weak: '专家设备溢价定位，价格不透明、过度医疗顾虑重' },
+      { name: '公立医院', weak: '权威普惠定位，排队久、体验差、服务温度不足' }] },
+  ],
+  finance: [
+    { m: /./, list: [
+      { name: '传统代账公司', weak: '低价熟人定位，账目粗放、政策更新滞后' },
+      { name: '大厂财税SaaS', weak: '工具系统定位，无法兼顾贴身顾问式服务' }] },
+  ],
+};
+function pickRivals(catId, l3Name) {
+  const arr = RIVALS[catId] || RIVALS.catering;
+  for (const g of arr) { if (g.m.test(l3Name)) return g.list; }
+  return arr[arr.length - 1].list;
+}
+
+/* 特性词选择：餐饮非饮品/甜品赛道避免「0蔗糖」类饮品特性错配 */
+function pickFeat(catId, l3Name, bank, r) {
+  if (catId === 'catering' && !/茶|咖|拿铁|饮|冰|糖水|果汁|甜|烘焙|蛋糕|酥|泡芙|舒芙蕾|糕/.test(l3Name)) {
+    return pick(['现熬汤底', '在地食材限定', '明档现制', '锅气现做', '小份实惠'], r);
+  }
+  return pick(bank.feat, r);
+}
+
+/* 本地信任状词库（🛡️ 区域第一信任状标识，按大类） */
+const TRUST_BANK = {
+  catering:  ['本地工厂直烘/央厨当日直供', '本地市场每日现采鲜料', '主厨本地人·祖传配方', '门店明档现制·全程可视'],
+  health:     ['持证技师100%实名可查', '本地三甲背景顾问坐镇', '国家级手法非遗传承', '调理档案数据化追踪'],
+  service:    ['全员实名认证+全程保险', '本地自营团队非外包', '服务过程全程录像可查', '不满意免费重做承诺'],
+  education:  ['教师资质全公示', '本地名校教研背景', '效果可视化成长档案', '不满意按课时退费'],
+  training:   ['真实就业offer墙公示', '本地企业定向内推', '讲师一线在职背景', '学不会免费重学'],
+  design:     ['本地落地案例100+实拍', '设计施工一体化交付', '报价透明无增项承诺', '交付延期按天赔付'],
+  medical:    ['执业医师资质全公示', '进口正品设备溯源码', '价目全透明无隐形消费', '术后终身档案管理'],
+  finance:    ['持证会计师团队实名', '本地税局政策直通', '风险先行赔付承诺', '数据银行级加密'],
 };
 
 /* ---------- 三级赛道热度标签（红海 | 蓝海 | 高潜 | 平稳） ----------
@@ -898,8 +1010,9 @@ function genHitProducts(catId, l3Name, basePrice, r) {
   }));
 }
 
-function fallbackGap(name, gapType, bank, r) {
+function fallbackGap(name, gapType, bank, r, rival) {
   const t = {
+    '对立定位': `站到「${rival.name}」的对立面：它做不到的，就是我们的定位（${rival.weak.split('，')[0]}）`,
     '人群空位': `聚焦头部忽视的「${pick(bank.aud, r)}」，做差异化人群定位`,
     '价格空位': `以「${pick(bank.price, r)}」价格带切入，避开红海价格战`,
     '场景空位': `占领「${pick(bank.scene, r)}」细分场景，建立专属心智`,
@@ -908,21 +1021,51 @@ function fallbackGap(name, gapType, bank, r) {
   return t[gapType];
 }
 
-function fallbackStrategy(catId, name, ocean, r) {
+/* 特劳特《定位》× 顾均辉 · 战略空位生成器
+ *  在原 competitors/painPoints/weaknesses/gap/gapType 基础上新增：
+ *  mindPain（心智痛点）/ rivalWeak（对立面弱点）/ positionType（定位类型 Badge）
+ *  / mindNail（心智钉子结论）/ tactics{hammer,traffic,trust}（3 大战术指令）
+ */
+function fallbackStrategy(catId, name, ocean, r, basePrice, hitProducts) {
   const bank = CAT_BANKS[catId] || CAT_BANKS.catering;
-  // 战略空位类型与热度标签联动：蓝海偏人群/场景，红海偏特性/价格，高潜偏特性/场景
+  const rivals = pickRivals(catId, name);
+  const rival = rivals[0], rival2 = rivals[1] || rivals[0];
+  // 定位类型与热度标签联动：红海→对立/价格；蓝海→人群/场景；高潜→特性/场景；平稳→价格/场景
   const gapType =
-    ocean === 'blue' ? pick(['人群空位', '场景空位'], r)
+    ocean === 'red'  ? pick(['对立定位', '价格空位'], r)
+    : ocean === 'blue' ? pick(['人群空位', '场景空位'], r)
     : ocean === 'high' ? pick(['特性空位', '场景空位'], r)
-    : ocean === 'red'  ? pick(['特性空位', '价格空位'], r)
     : pick(['价格空位', '场景空位'], r);
   const core = name.split('/')[0];
+  const feat = pickFeat(catId, name, bank, r);
+  const anchor = Math.max(2, Math.round((basePrice || 30) * 0.55));
+  const profit = Math.max(anchor + 4, Math.round((basePrice || 30) * 1.25));
+  const hit0 = (hitProducts && hitProducts[0]) ? hitProducts[0].name : core + '·招牌';
+  const hit1 = (hitProducts && hitProducts[1]) ? hitProducts[1].name : core + '·人气款';
+  const mindPain = pick(bank.pain, r);
+  const rivalWeak = `${rival.name}：${rival.weak}；${rival2.name}：${rival2.weak}`;
+  const mindNail = `对抗${rival.name}（${rival.weak.split('，')[0]}）：¥${anchor}「${feat}」${core}首选`;
+  const trust = pick(TRUST_BANK[catId] || TRUST_BANK.catering, r);
   return {
-    competitors: [{ name: pick(bank.comp, r).split('以')[0].replace(/头部|网红|老字号|大厂|在线|考证|连锁|平台|4A|工作室|传统|大厂财税|顾问|公立|小微|背景/g, '').slice(0, 6) || '头部品牌', mind: pick(bank.comp, r) }],
-    painPoints: [pick(bank.pain, r), pick(bank.pain, r)],
-    weaknesses: [pick(bank.weak, r), pick(bank.weak, r)],
-    gap: `围绕「${core}」，` + fallbackGap(name, gapType, bank, r),
+    competitors: [
+      { name: rival.name, mind: rival.weak },
+      { name: rival2.name, mind: rival2.weak },
+    ],
+    painPoints: [mindPain, pick(bank.pain, r)],
+    weaknesses: [rival.weak, rival2.weak],
+    gap: `围绕「${core}」，` + fallbackGap(name, gapType, bank, r, rival),
     gapType: gapType,
+    // —— 特劳特 4 大心智指标 ——
+    mindPain: mindPain,
+    rivalWeak: rivalWeak,
+    positionType: gapType,
+    mindNail: mindNail,
+    // —— 顾均辉 3 大战术指令 ——
+    tactics: {
+      hammer: `引流爆品（视觉锤）：「${hit0}」¥${anchor} 击穿心智；利润品：「${hit1}」¥${profit}；价格锚点：对标${rival.name}打出约 5-6 折的价值感知`,
+      traffic: `美团/点评：冲「${core}好评榜/回头客榜」，上 ¥${anchor} 秒杀套餐拉五星评价；抖音：铺 20+ 同城 KOC 探店短视频 + 团购挂链，抢占同城搜索词`,
+      trust: `本地信任状：「${trust}」——门店门头 / 美团详情页 / 抖音主页三端同步可视化呈现`,
+    },
   };
 }
 
@@ -948,9 +1091,9 @@ function genBase(catId, l3Id, name) {
   const bn = BRAND_BANKS[catId] || BRAND_BANKS.catering;
   const topBrands = [0, 1, 2].map(i => ({ name: bn[(i + Math.floor(r() * bn.length)) % bn.length], share: +(i === 0 ? rnd(12, 34) : rnd(3, 12)).toFixed(1) }));
   const persona = pick(PERSONA_BANKS[catId] || PERSONA_BANKS.catering, r);
-  const strategy = fallbackStrategy(catId, name, ocean, r);
   // 预置代表性爆品（2~3 个）
   const hitProducts = genHitProducts(catId, name, price, r);
+  const strategy = fallbackStrategy(catId, name, ocean, r, price, hitProducts);
   return { marketSize, growth, competition, penetration, price, repurchase, ocean, trend, topBrands, persona, strategy, hitProducts };
 }
 
@@ -1287,8 +1430,11 @@ CATEGORIES.forEach((cat, idx) => {
         let ana = genBase(cat.id, l3id, l3name);
         const cur = (CURATED[cat.id] && CURATED[cat.id][l3name]) || null;
         if (cur) {
+          const genStrategy = ana.strategy;
           ana = Object.assign(ana, cur);
-          if (cur.strategy) ana.strategy = cur.strategy;
+          // 精选策略与生成策略合并：保留特劳特心智指标与战术指令字段
+          if (cur.strategy) ana.strategy = Object.assign({}, genStrategy, cur.strategy);
+          else ana.strategy = genStrategy;
         }
         ANALYTICS[cat.id][l3id] = ana;
       });
@@ -1368,15 +1514,38 @@ function genRegionInsight(catId, l3Id, region) {
       heat: Math.round(rnd(60, 99)),
     }));
   }
-  // 本地化战略空位
+  // ===== 本地化战略空位（特劳特《定位》× 顾均辉 · 4 大心智指标） =====
   const s = base.strategy;
   const bank = CAT_BANKS[catId] || CAT_BANKS.catering;
-  const gapType = s.gapType;
-  const localGap = s.gap + `（落地「${rname}」时叠加本地标签：${prov.tags.slice(0, 2).join(' / ')}）`;
-  const localPain = pick(bank.pain, r) + `（在${rname}表现为本地供给不足、选择少、信息不透明）`;
-  const localWeak = `头部品牌在「${rname}」下沉不足 / 本地化弱，给新进入者留出了窗口`;
+  const gapType = s.positionType || s.gapType;
+  const core = l3name.split('/')[0];
+  const rivals = pickRivals(catId, l3name);
+  const rival = rivals[0], rival2 = rivals[1] || rivals[0];
+  const anchor = Math.max(2, Math.round(base.price * 0.55));
+  const profit = Math.max(anchor + 4, Math.round(base.price * 1.25));
+  const feat = pickFeat(catId, l3name, bank, r);
+  const hit0 = (base.hitProducts && base.hitProducts[0]) ? base.hitProducts[0].name : core + '·招牌';
+  const hit1 = (base.hitProducts && base.hitProducts[1]) ? base.hitProducts[1].name : core + '·人气款';
+  // 😣 本地客户心智痛点
+  const mindPain = `${rname}消费者的「${pick(bank.pain, r)}」渴望未被现有供给满足（本地${core}供给同质化、选择少、信息不透明）`;
+  // ⚠️ 竞品固有弱点（对立面）
+  const rivalWeak = `${rival.name}：${rival.weak}；${rival2.name}：${rival2.weak}——在${rname}同样无法兼顾`;
+  // 🏆 心智空位结论（特劳特定位钉子）
+  const mindNail = `对抗${rival.name}（${rival.weak.split('，')[0]}）：${rname}¥${anchor}「${feat}」${core}首选`;
+  // ===== 本地化切入点（顾均辉 · 3 大战术指令） =====
+  const trust = pick(TRUST_BANK[catId] || TRUST_BANK.catering, r);
+  const tacticHammer = `引流爆品（视觉锤）：「${hit0}」¥${anchor} 一款击穿心智；利润品组合：「${hit1}」¥${profit}；价格锚点：对标${rival.name}打出 5-6 折价值感知`;
+  const tacticTraffic = `美团/点评：抢占「${rname}${core}好评榜/回头客榜」，上 ¥${anchor} 秒杀套餐冲榜；抖音：铺 20+ ${rname}同城 KOC 探店 + 团购挂链，锁定「${rname}${core}」同城搜索词`;
+  const tacticTrust = `区域第一信任状：「${rname}·${trust}」——门店门头 / 美团详情页 / 抖音主页三端可视化呈现`;
+  // 兼容旧字段
+  const localGap = mindNail + `（落地「${rname}」时叠加本地标签：${prov.tags.slice(0, 2).join(' / ')}）`;
+  const localPain = mindPain;
+  const localWeak = rivalWeak;
   const query = `${rname} ${l3name} 市场规模 竞品 痛点 战略空位 蓝海`;
-  return { heat, competition, ocean, sizeMod, localBrands, products, gapType, localGap, localPain, localWeak, regionName: rname, query };
+  return { heat, competition, ocean, sizeMod, localBrands, products, gapType, localGap, localPain, localWeak,
+    mindPain, rivalWeak, positionType: gapType, mindNail,
+    tacticHammer, tacticTraffic, tacticTrust,
+    regionName: rname, query };
 }
 
 /* =========================================================================
@@ -1429,3 +1598,4 @@ if (typeof module !== 'undefined' && module.exports) {
     getTree, getNode, getChildren, getAnalytics, getPath, findL3Id, getRegionProf, applyRegion,
     getProvinces, getCities, getDistricts, genRegionInsight, regionNameOf };
 }
+
