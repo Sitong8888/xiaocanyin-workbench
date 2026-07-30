@@ -14,7 +14,7 @@ window.APP_CONFIG = {
   //      Cloudflare: "https://xiaocan-proxy.<你的子域>.workers.dev"
   //      Vercel:     "https://<你的>.vercel.app/api/brands"
   // 地址末尾带不带 "/api/brands" 均可，前端会自动拼接 ?q=。
-  // ✅ 已部署 Cloudflare Worker（2026-07-31）：
+  // ✅ 已部署 Cloudflare Worker（2026-07-31 升级为智谱 GLM-4.7-Flash + 联网搜索）：
   liveApiBase: "https://xiaocan-proxy.wubin877342196.workers.dev",
 
   // 可选：若你的代理需要简单鉴权（建议用一次性/低权限 key）

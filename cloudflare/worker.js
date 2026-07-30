@@ -1,17 +1,18 @@
 /**
  * 小餐饮爆品工作台 — 实时联网代理 (Cloudflare Worker)
  * ---------------------------------------------------------------------------
- * 功能：接收前端 ?q= 检索词，调用 DeepSeek 生成结构化「区域 TOP 品牌 / 爆品」。
+ * 功能：接收前端 ?q= 检索词，调用【智谱 GLM-4.7-Flash】并开启联网搜索，
+ *       从公开的网页（美团 / 大众点评榜单、媒体、本地生活资讯等）中抽取结构化
+ *       「区域 TOP 品牌 / 爆品」。
  *
- * 安全：DEEPSEEK_API_KEY 仅存于 Worker 环境变量(secret)，绝不进入前端或仓库。
- *       —— 用 `wrangler secret put DEEPSEEK_API_KEY` 设置，不要写进 wrangler.toml。
+ * 安全：ZHIPU_API_KEY 仅存于 Worker 环境变量(secret)，绝不进入前端或仓库。
+ *       —— 用 `wrangler secret put ZHIPU_API_KEY` 设置，不要写进 wrangler.toml。
  *
- * 数据真实性说明：
- *   DeepSeek 原生无联网搜索能力。默认情况下（仅配置 DEEPSEEK_API_KEY）代理基于
- *   DeepSeek 的模型知识输出真实知名品牌，返回 source="deepseek-knowledge"。
- *   若同时配置 SEARCH_API_KEY + SEARCH_PROVIDER(serpapi|tavily)，则先做真实网页
- *   搜索，再让 DeepSeek 从真实公开结果中抽取，数据更贴近「实时」
- *   （返回 source="web-search+deepseek"）。
+ * 模型 & 联网：
+ *   - Endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
+ *   - Model:    glm-4.7-flash（若智谱默认映射为 glm-4-flash，自动兼容回退）
+ *   - 鉴权:     Authorization: Bearer [ZHIPU_API_KEY]
+ *   - 联网搜索: tools: [{ type: "web_search", web_search: { search_result: true } }]
  *
  * 与前端契约一致：返回 {"brands":[{brandName,hotItem,avgPrice,rating,tag}]}
  * ---------------------------------------------------------------------------
@@ -22,6 +23,10 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
 };
+
+// 智谱 GLM 模型列表：优先 glm-4.7-flash，失败自动回退 glm-4-flash
+const ZHIPU_MODELS = ['glm-4.7-flash', 'glm-4-flash'];
+const ZHIPU_ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
 export default {
   async fetch(request, env, ctx) {
@@ -43,17 +48,13 @@ export default {
       return json({ error: 'missing q' }, 400);
     }
 
-    if (!env.DEEPSEEK_API_KEY) {
+    if (!env.ZHIPU_API_KEY) {
       // 代理未配置 key → 前端会优雅降级到基准数据
-      return json({ error: 'server not configured (DEEPSEEK_API_KEY missing)', degraded: true }, 500);
+      return json({ error: 'server not configured (ZHIPU_API_KEY missing)', degraded: true }, 500);
     }
 
     try {
-      let searchContext = '';
-      if (env.SEARCH_API_KEY && env.SEARCH_PROVIDER) {
-        searchContext = await webSearch(env.SEARCH_PROVIDER, env.SEARCH_API_KEY, q);
-      }
-      const data = await queryDeepSeek(env.DEEPSEEK_API_KEY, q, searchContext);
+      const data = await queryZhipu(env.ZHIPU_API_KEY, q);
       return json(data, 200);
     } catch (e) {
       const msg = (e && e.message) ? e.message : String(e);
@@ -69,97 +70,103 @@ function json(obj, status) {
   });
 }
 
-// ---- 可选：真实网页搜索（需另行配置搜索 API Key）----
-async function webSearch(provider, key, q) {
-  if (provider === 'serpapi') {
-    const r = await fetch(
-      'https://serpapi.com/search.json?engine=google&num=10&q=' +
-        encodeURIComponent(q) + '&api_key=' + key
-    );
-    if (!r.ok) throw new Error('SerpAPI HTTP ' + r.status);
-    const j = await r.json();
-    return (j.organic_results || [])
-      .map((o) => (o.title || '') + ' ' + (o.snippet || ''))
-      .join('\n');
+// ---- 调用智谱 GLM（开启联网搜索，自动兼容模型名）----
+async function queryZhipu(key, q) {
+  const sys = '你是餐饮市场研究助手。只输出 JSON，不要任何解释、不要 markdown 代码块。';
+  const user = buildPrompt(q);
+  const tools = [{ type: 'web_search', web_search: { search_result: true } }];
+
+  let lastErr = null;
+  for (const model of ZHIPU_MODELS) {
+    try {
+      const data = await callZhipu(key, q, sys, user, tools, model);
+      return data;
+    } catch (e) {
+      // 模型名相关错误 → 尝试下一个兼容模型；其他错误直接抛出
+      if (e && e.modelError) {
+        lastErr = e;
+        continue;
+      }
+      throw e;
+    }
   }
-  if (provider === 'tavily') {
-    const r = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: key, query: q, max_results: 8, search_depth: 'advanced' }),
-    });
-    if (!r.ok) throw new Error('Tavily HTTP ' + r.status);
-    const j = await r.json();
-    return (j.results || [])
-      .map((o) => (o.title || '') + ' ' + (o.content || ''))
-      .join('\n');
-  }
-  return '';
+  throw lastErr || new Error('Zhipu 调用失败（所有候选模型均不可用）');
 }
 
-// ---- 调用 DeepSeek ----
-async function queryDeepSeek(key, q, searchContext) {
-  const sys = '你是餐饮市场研究助手。只输出 JSON，不要任何解释或 markdown 代码块。';
-  const user = buildPrompt(q, searchContext);
-
-  const r = await fetch('https://api.deepseek.com/chat/completions', {
+async function callZhipu(key, q, sys, user, tools, model) {
+  const r = await fetch(ZHIPU_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + key,
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model,
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: user },
       ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
+      tools,
+      // 不使用 response_format，避免与工具冲突；改用提示词强约束 + 容错解析
+      temperature: 0.5,
     }),
   });
 
   if (!r.ok) {
     const t = await r.text();
-    throw new Error('DeepSeek HTTP ' + r.status + ' ' + t.slice(0, 200));
+    // 404 / 模型名报错 → 标记为 modelError 以触发回退
+    const isModelErr =
+      r.status === 404 ||
+      /model/i.test(t) ||
+      /unknown/i.test(t) ||
+      /not found/i.test(t);
+    const err = new Error('Zhipu HTTP ' + r.status + ' ' + t.slice(0, 200));
+    err.modelError = isModelErr;
+    throw err;
   }
 
   const j = await r.json();
   const content =
     (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '{}';
 
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (e) {
-    throw new Error('DeepSeek 返回非 JSON');
-  }
-
+  const parsed = extractJSON(content);
   const brands = Array.isArray(parsed.brands) ? parsed.brands : [];
   return {
     region: parsed.region || '',
     query: q,
-    source: searchContext ? 'web-search+deepseek' : 'deepseek-knowledge',
+    source: 'zhipu-web-search',
+    model, // 回传实际命中的模型名，便于前端/调试核对
     brands: brands.slice(0, 8).map(norm),
   };
 }
 
-function buildPrompt(q, searchContext) {
-  const base = `针对检索词「${q}」，列出该区域真实存在/知名的品牌与招牌爆品。`;
-  const schema = `返回严格 JSON：
-{"region":"区域名","query":"${q}","brands":[{"brandName":"品牌名","hotItem":"招牌爆品","avgPrice":人均元(数字),"rating":评分0-5(数字),"tag":"红海|蓝海|高潜|平稳"}]}
-要求：brandName 必须是真实品牌；tag 标注竞争态势；最多 6 条。`;
+function buildPrompt(q) {
+  return `针对检索词「${q}」，联网查一查该区域（省/市/区县）在美团、大众点评上真实热门的餐饮品牌与招牌爆品，并列出。
 
-  if (searchContext) {
-    return `${base}
-以下是联网搜索到的真实公开信息（来自美团/大众点评/媒体榜单等），请仅从这些真实结果中抽取品牌与爆品，不要编造：
-==== 搜索结果 ====
-${searchContext}
-==== 结束 ====
-${schema}`;
+只输出如下严格 JSON（不要任何解释、不要 markdown 代码块）：
+{"region":"区域名","query":"${q}","brands":[{"brandName":"品牌名","hotItem":"招牌爆品","avgPrice":人均元(数字),"rating":评分0-5(数字),"tag":"红海|蓝海|高潜|平稳"}]}
+要求：
+- brandName 必须是在该区域真实存在/知名的品牌（可来自美团/大众点评榜单、本地生活媒体）；
+- hotItem 是它最出圈的招牌爆品；
+- avgPrice / rating 尽量贴近真实公开数据，未知可填 0；
+- tag 标注竞争态势（红海=竞争激烈、蓝海=空白机会、高潜=快速增长、平稳=稳定）；
+- 最多 6 条，按热度排序。`;
+}
+
+// 容错 JSON 解析：剥离可能的 markdown 代码块，并截取首个 { 到末个 }
+function extractJSON(text) {
+  if (!text) return {};
+  let s = String(text).trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1];
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) return {};
+  try {
+    return JSON.parse(s.slice(start, end + 1));
+  } catch (e) {
+    return {};
   }
-  return `${base}
-${schema}`;
 }
 
 function norm(b) {
