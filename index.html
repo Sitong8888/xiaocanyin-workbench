@@ -12,27 +12,23 @@
     <p class="sub">小餐饮 / 教育 / 培训 / 健康 / 服务 / 设计 / 医疗 / 金融 · 全行业爆品与赛道筛选工作台</p>
   </header>
 
-  <!-- ① 行业大类 -->
+  <!-- ① 选择区域（置顶） -->
   <section class="card">
-    <h2 class="sec-title">① 选择行业大类</h2>
-    <div class="cat-select-wrap">
-      <select id="catSelect" class="cat-select" aria-label="选择行业大类"></select>
-    </div>
-  </section>
-
-  <!-- ② 选择区域 -->
-  <section class="card">
-    <h2 class="sec-title">② 选择区域</h2>
+    <h2 class="sec-title">① 选择区域</h2>
     <button id="regionPick" class="btn-pick">选择区域 ▾</button>
     <div id="regionPanel" class="region-panel"></div>
     <div id="regionBanner" class="region-banner empty"></div>
-    <!-- 区域动态洞察（联网实时查询） -->
-    <div id="regionInsight" class="region-insight"></div>
   </section>
 
-  <!-- ③ 分析对象选择 -->
+  <!-- ② 选择分析对象（主 vs 对比，含行业大类） -->
   <section class="card">
-    <h2 class="sec-title">③ 选择分析对象（主 vs 对比）</h2>
+    <h2 class="sec-title">② 选择分析对象（主 vs 对比）</h2>
+    <div class="cat-line">
+      <span class="cat-label">行业大类</span>
+      <div class="cat-select-wrap">
+        <select id="catSelect" class="cat-select" aria-label="选择行业大类"></select>
+      </div>
+    </div>
     <div class="cascader-wrap">
       <div class="cascader-head" data-group="A">
         <span class="badge badge-a">主分析对象 A</span>
@@ -52,8 +48,13 @@
 
   <div id="emptyState" class="empty">请选择分析对象，查看全景看板</div>
 
-  <!-- 看板 -->
+  <!-- ③ 数据分析看板（含区域动态洞察 + KPI + 图表 + 战略空位） -->
   <section id="dashboard" class="dashboard" hidden>
+    <div class="card">
+      <h2 class="sec-title">③ 区域动态洞察 <span class="hint">（联网实时查询）</span></h2>
+      <div id="regionInsight" class="region-insight"></div>
+    </div>
+
     <div class="card">
       <h2 class="sec-title">④ 核心指标卡（KPI）</h2>
       <div id="kpiWrap" class="kpi-swipe"></div>
