@@ -76,10 +76,16 @@ body {
 .cascader-path b { color: var(--ink); }
 
 .cascader-panel {
-  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
-  margin-top: 10px; max-height: 220px; overflow: auto;
+  display: none;            /* 默认隐藏，由 .open 类控制展开，彻底避免 hidden 与 display 冲突 */
+  margin-top: 10px; max-height: 260px; overflow: auto;
   border-top: 1px dashed var(--line); padding-top: 10px;
 }
+.cascader-panel.open {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+}
+/* 确保展开后的面板浮在文档流之上、不被遮挡，且子项始终可点 */
+.cascader-panel.open { position: relative; z-index: 5; }
+.casc-item, .btn-pick { position: relative; z-index: 1; }
 .casc-col { display: flex; flex-direction: column; gap: 4px; }
 .casc-col .col-label { font-size: 10px; color: var(--ink-2); text-align: center; margin-bottom: 2px; }
 .casc-item {

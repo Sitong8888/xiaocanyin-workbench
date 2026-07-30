@@ -51,7 +51,7 @@ function renderCascader(group) {
     }
     nodes.forEach(n => {
       const b = document.createElement('button');
-      const ocean = getAnalytics(n.id).ocean;
+      const ocean = lv === 3 ? getAnalytics(n.id).ocean : null;
       b.className = 'casc-item' + (lv === 3 ? ' leaf' : '') + (sel['L' + lv] === n.id ? ' active' : '');
       b.innerHTML = `${n.name}` + (lv === 3 ? `<span class="mini">${OCEAN_TEXT[ocean]}</span>` : '');
       b.onclick = () => {
@@ -61,6 +61,12 @@ function renderCascader(group) {
         renderCascader(group);
         updatePath(group);
         maybeRender();
+        // 选完三级行业后自动收起面板，移动端操作更顺畅
+        if (lv === 3) {
+          panel.classList.remove('open');
+          const pb = document.querySelector(`.btn-pick[data-group="${group}"]`);
+          if (pb) pb.textContent = '重新选择 ▾';
+        }
       };
       col.appendChild(b);
     });
@@ -78,6 +84,8 @@ function updatePath(group) {
 }
 
 /* ---------- 看板渲染 ---------- */
+function safe(fn) { try { return fn(); } catch (e) { console.error('[render]', e); } }
+
 function maybeRender() {
   const a = state.A.sel.L3, b = state.B.sel.L3;
   const empty = document.getElementById('emptyState');
@@ -86,21 +94,21 @@ function maybeRender() {
 
   if (a && b) {
     empty.hidden = true; dash.hidden = false; drill.hidden = false;
-    renderKPI(a, b);
-    renderRadar(a, b);
-    renderMatrix(a, b);
-    renderLine(a, b);
+    safe(() => renderKPI(a, b));
+    safe(() => renderRadar(a, b));
+    safe(() => renderMatrix(a, b));
+    safe(() => renderLine(a, b));
   } else if (a || b) {
     empty.hidden = true; dash.hidden = false; drill.hidden = true;
     const only = a || b;
-    renderKPI(only, null);
-    renderRadar(only, null);
-    renderMatrix(only, null);
-    renderLine(only, null);
+    safe(() => renderKPI(only, null));
+    safe(() => renderRadar(only, null));
+    safe(() => renderMatrix(only, null));
+    safe(() => renderLine(only, null));
   } else {
     empty.hidden = false; dash.hidden = true;
   }
-  renderStrategy(); // ④ 战略空位分析面板
+  safe(() => renderStrategy()); // ④ 战略空位分析面板
 }
 
 function fmt(v) { return v.toLocaleString('zh-CN'); }
@@ -417,26 +425,45 @@ function closeDrawer() {
   document.getElementById('drawer').hidden = true;
 }
 
-/* ---------- 事件绑定 ---------- */
-document.querySelectorAll('.btn-pick').forEach(btn => {
-  btn.onclick = () => {
-    const g = btn.dataset.group;
-    const panel = document.querySelector(`[data-panel="${g}"]`);
-    const willShow = panel.hidden;
-    document.querySelectorAll('.cascader-panel').forEach(p => p.hidden = true);
-    if (willShow) { renderCascader(g); panel.hidden = false; btn.textContent = '收起 ▴'; }
-    else { panel.hidden = true; btn.textContent = '选择行业 ▾'; }
-  };
-});
-document.getElementById('drillBtn').onclick = openDrawer;
-document.getElementById('drawerClose').onclick = closeDrawer;
-document.getElementById('drawerMask').onclick = closeDrawer;
+/* ---------- 事件绑定（类切换式，彻底避免 hidden 与 display:grid 冲突） ---------- */
+function bindPick(group) {
+  const btn = document.querySelector(`.btn-pick[data-group="${group}"]`);
+  const panel = document.querySelector(`[data-panel="${group}"]`);
+  if (!btn || !panel) return;
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const isOpen = panel.classList.contains('open');
+    // 关闭其它面板并复位其按钮文案
+    document.querySelectorAll('.cascader-panel').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.btn-pick').forEach(b => { if (b !== btn) b.textContent = '选择行业 ▾'; });
+    if (!isOpen) {
+      renderCascader(group);
+      panel.classList.add('open');
+      btn.textContent = '收起 ▴';
+    } else {
+      btn.textContent = '选择行业 ▾';
+    }
+  });
+}
 
-// 初始化：默认各选一个示例，方便进入即见效果
-(function initDefault() {
-  // A: 鲜果茶 / B: 螺蛳粉（均红海，便于演示空位对比）
+function boot() {
+  ['A', 'B'].forEach(bindPick);
+  const drill = document.getElementById('drillBtn');
+  if (drill) drill.addEventListener('click', openDrawer);
+  const dClose = document.getElementById('drawerClose');
+  if (dClose) dClose.addEventListener('click', closeDrawer);
+  const dMask = document.getElementById('drawerMask');
+  if (dMask) dMask.addEventListener('click', closeDrawer);
+
+  // 初始化：默认各选一个示例，进入即见效果（鲜果茶 vs 螺蛳粉，均红海，便于演示空位对比）
   state.A.sel = { L1: 'L1_1', L2: 'L2_1_1', L3: 'L3_1_1_1' };
   state.B.sel = { L1: 'L1_2', L2: 'L2_2_2', L3: 'L3_2_2_2' };
   updatePath('A'); updatePath('B');
   maybeRender();
-})();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
