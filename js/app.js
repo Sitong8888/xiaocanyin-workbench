@@ -605,6 +605,9 @@
       ${regionChip}
       <div class="drawer-sub">🏆 代表品牌 / 爆品（按市占）</div>
       ${brands}
+      ${(ana.hitProducts && ana.hitProducts.length) ? `
+      <div class="drawer-sub">🔥 预置爆品（数据字典）</div>
+      <div class="drawer-hits">${ana.hitProducts.map(h => `<span class="hit-chip">${esc(h.name)}<i>¥${h.price}·${h.tag}</i></span>`).join('')}</div>` : ''}
       <div class="drawer-sub">👥 人群画像</div>
       <div class="drawer-persona">${ana.persona}</div>
       <div class="drawer-sub">🎯 战略空位</div>

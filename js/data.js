@@ -8,177 +8,135 @@
  *  纯静态、无外部依赖；浏览器与 Node 均可直接运行。
  * ========================================================================= */
 
-/* ---------- 行业大类 ---------- */
+/* ---------- 行业大类（8 大行业精细化分类全景图） ---------- */
 const CATEGORIES = [
-  { id: 'catering',  name: '餐饮', icon: '🍜' },
-  { id: 'education', name: '教育', icon: '📚' },
-  { id: 'training',  name: '培训', icon: '🎓' },
-  { id: 'health',    name: '健康', icon: '💪' },
+  { id: 'catering',  name: '餐饮', icon: '🍽️' },
+  { id: 'health',    name: '健康', icon: '🌿' },
   { id: 'service',   name: '服务', icon: '🧹' },
+  { id: 'education', name: '教育', icon: '📚' },
+  { id: 'training',  name: '培训', icon: '🚀' },
   { id: 'design',    name: '设计', icon: '🎨' },
   { id: 'medical',   name: '医疗', icon: '🏥' },
-  { id: 'finance',   name: '金融', icon: '💰' },
+  { id: 'finance',   name: '金融', icon: '💼' },
 ];
 
 /* ---------- 行业树结构（按大类，数组形式便于维护） ----------
  * 结构: [ [L1名称, [ [L2名称, [L3名称, ...]], ... ]], ... ]
  */
+/* ---------- 行业树结构（8 大行业 · 一级赛道 → 二级品类 → 三级细分） ----------
+ * 结构: [ [L1名称, [ [L2名称, [L3名称, ...]], ... ]], ... ]
+ * L3 名称沿用全景图原标签（含「/」表示并列细分，作为单个节点保留）。
+ */
 const TREE_STRUCT = {
   catering: [
     ['茶饮咖啡', [
-      ['新中式茶饮', ['鲜果茶', '冰吸柠檬茶', '轻乳茶']],
-      ['咖啡饮品', ['精品咖啡', '果咖特调', '美式拿铁']],
+      ['新中式茶饮', ['鲜果茶', '轻乳茶/原叶鲜奶茶', '手打柠檬茶', '纯茶/功夫茶']],
+      ['咖啡饮品', ['特调咖啡', '生椰/生酪拿铁', '果咖/气泡咖', '冷萃/冰滴咖啡']],
+      ['冰品甜饮', ['刨冰/绵绵冰', '港式糖水/杨枝甘露', '鲜榨果汁/生椰乳']],
     ]],
     ['小吃快餐', [
-      ['米粉面食', ['螺蛳粉', '牛肉面', '酸辣粉', '米粉', '武汉热干面']],
-      ['炸物烧烤', ['炸鸡', '炸串', '中式烧烤', '韩式烤肉']],
-      ['包子粥铺', ['小笼包', '生煎包', '皮蛋瘦肉粥']],
-      ['麻辣烫冒菜', ['麻辣烫', '冒菜', '串串麻辣']],
-      ['饭食盖饭', ['黄焖鸡米饭', '猪脚饭', '盖浇饭']],
-      ['煎饼卷饼', ['煎饼果子', '手抓饼', '卷饼']],
+      ['特色粉面', ['螺蛳粉', '重庆小面/酸辣粉', '兰州拉面', '云南米线', '湖南牛肉粉/江西粉']],
+      ['炸鸡小吃', ['中式炸鸡/鸡排', '韩式炸鸡', '炸串/钵钵鸡', '小龙虾/卤味小吃']],
+      ['卤味熟食', ['现卤鸭货', '紫燕百味鸡/凉拌菜', '海鲜卤味', '热卤/卤味火锅菜']],
+      ['中式便当', ['现炒快餐', '木桶饭/煲仔饭', '黄焖鸡米饭', '港式烧腊/深井烧鹅']],
     ]],
-    ['烘焙甜品', [
-      ['蛋糕甜品', ['千层蛋糕', '提拉米苏', '巴斯克']],
-      ['中式糕点', ['麻薯', '蛋黄酥', '桂花糕']],
-      ['面包吐司', ['软欧包', '贝果']],
+    ['地方菜系', [
+      ['川湘菜', ['概念川菜/水煮鱼', '地道湘菜/辣椒炒肉', '酸菜鱼/沸腾鱼']],
+      ['粤菜/港式', ['广式早茶/点心', '港式茶餐厅', '粤菜生鲜/打边炉']],
+      ['北方菜/地方特色', ['东北菜/铁锅炖', '西北菜/烤羊肉串', '北京烤鸭/京味菜']],
     ]],
     ['火锅串串', [
-      ['市井火锅', ['牛油火锅', '酸汤火锅', '猪肚鸡火锅']],
-      ['串串香', ['冷锅串串', '钵钵鸡', '麻辣烫串']],
-      ['干锅香锅', ['干锅虾', '麻辣香锅']],
+      ['川渝麻辣火锅', ['重庆老火锅', '成都清油火锅', '盘盘麻辣烫/串串香']],
+      ['特色汤底火锅', ['潮汕牛肉火锅', '海南椰子鸡', '台式麻辣/番茄锅', '猪肚鸡/打边炉']],
+      ['自助/小火锅', ['旋转小火锅', '回转自助火锅', '一人食火锅']],
     ]],
-    ['夜宵烧烤', [
-      ['烧烤撸串', ['中式烧烤', '韩式烤肉', '烤串']],
-      ['小龙虾', ['麻辣小龙虾', '蒜蓉小龙虾']],
-      ['夜宵粥铺', ['砂锅粥', '夜宵烧烤']],
+    ['烘焙甜品', [
+      ['中式糕点', ['新中式烘焙/麻薯/蛋黄酥', '传统桃酥/绿豆糕', '现烤糕点']],
+      ['西式甜品', ['奶油生日蛋糕', '巴斯克/切片蛋糕', '法式甜品/可颂', '舒芙蕾/泡芙']],
     ]],
-    ['轻食沙拉', [
-      ['健康轻食', ['沙拉碗', '低卡便当', '波奇碗']],
-      ['饮品轻食', ['酸奶碗', '果昔']],
+  ],
+  health: [
+    ['养生理疗', [
+      ['中医调理', ['中医推拿/正骨', '艾灸/拔罐', '刮痧/熏蒸', '药食同源茶饮/膏方']],
+      ['头疗采耳', ['沉浸式头疗/洗头', '专业采耳/耳道护理', '面部SPA']],
+      ['足浴SPA', ['泰式古法按摩', '日式指压', '精油SPA', '足道采耳']],
+    ]],
+    ['运动健身', [
+      ['健身场馆', ['24h自助健身房', '精品团课工作室', '私教一对一工作室']],
+      ['专项运动', ['普拉提/瑜伽工作室', '拳击/格斗馆', '羽毛球/网球馆', '室内滑雪/攀岩']],
+      ['体能康复', ['运动康复/肌骨损伤恢复', '产后修复/体态矫正']],
+    ]],
+  ],
+  service: [
+    ['丽人美业', [
+      ['美发造型', ['发型设计/烫染', '头皮理疗/洗护', '快剪/男士理发']],
+      ['美甲美睫', ['日系美甲', '美睫嫁接', '手足护理']],
+      ['皮肤管理', ['科技美肤/清洁', '抗衰提拉/水光', '祛痘/敏感肌修护']],
+      ['纹绣彩妆', ['半永久纹眉/纹唇', '新娘妆/日常造型']],
+    ]],
+    ['家政保洁', [
+      ['日常/深度保洁', ['按时保洁', '新房开荒保洁', '开工深度清洁']],
+      ['家电清洗', ['空调清洗', '抽油烟机清洗', '洗衣机/冰箱消毒']],
+      ['洗护整理', ['上门干洗/洗鞋', '全屋收纳整理', '软装除螨']],
+    ]],
+    ['宠物服务', [
+      ['宠物洗护/美容', ['猫狗洗澡/造型', '宠物SPA/寄养']],
+      ['宠物医疗/健康', ['宠物医院/疫苗', '宠物体检/绝育']],
     ]],
   ],
   education: [
     ['素质教育', [
-      ['艺术启蒙', ['儿童少儿美术', '少儿编程', '少儿舞蹈', '少儿声乐']],
-      ['体能运动', ['少儿体适能', '少儿游泳', '少儿篮球']],
-      ['科创启蒙', ['乐高机器人', '少儿科学']],
+      ['艺术培养', ['少儿美术/书法', '钢琴/古筝/吉他', '少儿舞蹈/芭蕾']],
+      ['科技创新', ['少儿编程/机器人', '科学实验/乐高构筑']],
+      ['语言表达', ['少儿主持/演讲', '少儿英语/戏剧']],
     ]],
-    ['学科培优', [
-      ['K12学科', ['小学语文', '初中数学', '高中物理']],
-      ['语言素养', ['少儿英语', '口才演讲', '阅读写作']],
-    ]],
-    ['早幼教', [
-      ['托育早教', ['亲子早教', '托育中心', '蒙氏早教']],
-      ['幼小衔接', ['拼音识字', '思维启蒙']],
+    ['体能托育', [
+      ['少儿体育', ['少儿篮球/足球', '体能训练/平衡车', '少儿跆拳道/游泳']],
+      ['托育早教', ['0-3岁早教中心', '日托/半日托']],
     ]],
   ],
   training: [
     ['职业技能', [
-      ['新媒体IT', ['AI应用培训', '短视频带货', '编程开发', 'UI设计']],
-      ['餐饮服务', ['咖啡师培训', '西点烘焙培训', '调酒师']],
-      ['美容美业', ['美甲美睫', '皮肤管理']],
+      ['数字AI与新媒体', ['AI应用/Prompt工程', '短视频剪辑/运营', '直播带货/电商运营']],
+      ['IT与编程', ['前端/后端开发', '数据分析/Python', '软件测试/UI设计']],
+      ['餐饮/手艺技能', ['咖啡师/调酒师培训', '西点烘焙培训', '轻食/餐饮创业培训']],
     ]],
-    ['考公考证', [
-      ['公考事业', ['公务员考试', '事业单位考试', '教师编']],
-      ['资格认证', ['教师资格证', '会计资格证', '消防工程师']],
-    ]],
-    ['兴趣拓展', [
-      ['生活美学', ['花艺培训', '茶艺培训', '香道']],
-      ['运动技能', ['游泳教练', '滑雪教练']],
-    ]],
-  ],
-  health: [
-    ['中医理疗', [
-      ['艾灸养生', ['艾灸', '葫芦灸', '温灸']],
-      ['推拿正骨', ['推拿按摩', '正骨', '刮痧拔罐']],
-      ['药食同源', ['药食茶饮', '膏方调理', '五谷养生']],
-    ]],
-    ['运动健身', [
-      ['健身塑形', ['私教工作室', '团课操课', '撸铁馆']],
-      ['瑜伽普拉提', ['普拉提馆', '瑜伽馆', '孕产瑜伽']],
-    ]],
-    ['心理疗愈', [
-      ['情绪管理', ['心理咨询', '正念冥想']],
-      ['睡眠健康', ['助眠调理', '身心放松']],
-    ]],
-    ['养生滋补', [
-      ['膏方滋补', ['阿胶糕', '人参滋补']],
-      ['轻断食', ['轻断食营', '排毒']],
-    ]],
-  ],
-  service: [
-    ['家政生活', [
-      ['上门服务', ['上门家政清洁', '收纳整理', '月嫂育儿', '养老陪护']],
-      ['维修维保', ['家电清洗', '管道疏通', '开锁换锁']],
-      ['洗衣洗护', ['上门取送洗衣', '鞋包护理']],
-    ]],
-    ['宠物服务', [
-      ['宠物护理', ['宠物洗护', '宠物寄养', '宠物绝育']],
-      ['宠物医疗', ['宠物诊所', '宠物疫苗']],
-      ['宠物训练', ['狗狗行为训练']],
-    ]],
-    ['汽车服务', [
-      ['洗车养护', ['上门洗车', '汽车美容', '内饰清洗']],
-      ['维修保养', ['上门保养', '道路救援']],
-    ]],
-    ['便民跑腿', [
-      ['代买代办', ['排队代办', '代取送']],
-      ['搬家货运', ['mini搬家', '货拉拉式']],
+    ['考证考研', [
+      ['公考/事业单位', ['国考/省考培训', '教师资格证', '事业单位统考']],
+      ['职业资格证', ['注册会计师(CPA)', '执业医师/药师', '健康管理师/心理咨询师']],
     ]],
   ],
   design: [
-    ['空间设计', [
-      ['商业空间', ['餐饮门面设计', '展厅设计', '奶茶店设计', '零售门店']],
-      ['家居设计', ['全屋定制', '软装搭配', '旧房改造']],
-      ['办公空间', ['联合办公', '办公室设计']],
+    ['商业空间设计', [
+      ['餐饮门面设计', ['品牌VI/门店空间设计', '网红茶饮/咖啡店设计']],
+      ['零售展厅设计', ['服装品牌专卖店', '展示体验馆/展厅设计']],
     ]],
-    ['平面视觉', [
-      ['品牌设计', ['LOGO设计', '包装设计', 'VI设计']],
-      ['新媒体视觉', ['小红书视觉', '电商详情页', '海报']],
+    ['室内装修设计', [
+      ['全屋整装设计', ['现代简约风设计', '新中式/法式复古设计', '全屋定制排布']],
+      ['局部改造设计', ['厨卫翻新设计', '阳台/儿童房改建']],
     ]],
-    ['数字体验', [
-      ['UIUX', ['APP界面设计', '小程序设计', '网页设计']],
-      ['摄影摄像', ['产品摄影', '短视频拍摄']],
-    ]],
-    ['工业设计', [
-      ['产品造型', ['小家电设计', '包装结构']],
+    ['品牌视觉设计', [
+      ['平面品牌设计', ['Logo/VI视觉系统', '产品包装/礼盒设计', '宣传册/海报设计']],
     ]],
   ],
   medical: [
-    ['专科理疗', [
-      ['消费医疗', ['牙齿矫正', '眼科屈光', '医美皮肤', '植发']],
-      ['中医理疗', ['中医正骨', '针灸推拿', '艾灸馆']],
-      ['口腔', ['种植牙', '儿童齿科']],
+    ['消费医疗/齿科', [
+      ['口腔齿科', ['隐形/金属牙齿矫正', '种植牙', '超声波洁牙/冷光美白']],
+      ['眼科视光', ['近视屈光手术(全飞秒/半飞秒)', '角膜塑形镜(OK镜)', '青少年近视防控']],
     ]],
-    ['健康检测', [
-      ['体检筛查', ['健康体检', '基因检测', '早癌筛查']],
-      ['影像', ['核磁共振', '超声']],
-    ]],
-    ['康养护理', [
-      ['银发照护', ['上门护理', '养老机构', '认知症照护']],
-      ['母婴护理', ['月子中心', '产后康复']],
-    ]],
-    ['轻医疗', [
-      ['医美', ['皮肤管理', '微整', '纹眉']],
-      ['眼科', ['视光配镜', 'OK镜']],
+    ['医美形体', [
+      ['轻医美/注射', ['玻尿酸填充', '肉毒素瘦脸/除皱', '光电皮秒/热玛吉']],
+      ['整形外科', ['眼部综合/鼻部综合', '吸脂/形体雕塑']],
     ]],
   ],
   finance: [
-    ['财税服务', [
-      ['企业财税', ['代理记账', '纳税筹划', '审计验资', '社保代缴']],
-      ['融资顾问', ['企业贷款', '股权融资', '供应链金融']],
+    ['企业财税/工商', [
+      ['工商财税', ['代理记账/报税', '公司注册/变更', '商标/知识产权代理']],
+      ['筹划与审计', ['税务筹划/合规', '财务审计/验资', '高企认定申报']],
     ]],
-    ['保险保障', [
-      ['财产保险', ['企业财产险', '工程险', '车险']],
-      ['人身保障', ['家庭保障规划', '重疾险', '养老险']],
-    ]],
-    ['投资理财', [
-      ['财富管理', ['基金投顾', '家族信托', '资产配置']],
-      ['数字资产', ['加密货币咨询']],
-    ]],
-    ['法律服务', [
-      ['企业法务', ['合同审查', '股权架构']],
-      ['知产', ['商标注册', '专利申请']],
+    ['金融/融资服务', [
+      ['企业融资贷款', ['抵押贷/信用贷咨询', '经营贷/供应链金融']],
+      ['个人金融服务', ['房贷/车贷咨询', '保险规划/理财咨询']],
     ]],
   ],
 };
@@ -791,6 +749,155 @@ const CAT_BANKS = {
   },
 };
 
+/* ---------- 三级赛道热度标签（红海 | 蓝海 | 高潜 | 平稳） ----------
+ * 显式覆盖每个三级细分，作为「竞争烈度/增长」的人readable 标注；
+ * genBase 优先采用此标签，缺失时回退到数值推导。
+ */
+const HEAT_TAG = {
+  // 餐饮
+  '鲜果茶': 'red', '轻乳茶/原叶鲜奶茶': 'red', '手打柠檬茶': 'high', '纯茶/功夫茶': 'stable',
+  '特调咖啡': 'high', '生椰/生酪拿铁': 'high', '果咖/气泡咖': 'high', '冷萃/冰滴咖啡': 'stable',
+  '刨冰/绵绵冰': 'high', '港式糖水/杨枝甘露': 'high', '鲜榨果汁/生椰乳': 'high',
+  '螺蛳粉': 'red', '重庆小面/酸辣粉': 'red', '兰州拉面': 'stable', '云南米线': 'high', '湖南牛肉粉/江西粉': 'stable',
+  '中式炸鸡/鸡排': 'red', '韩式炸鸡': 'red', '炸串/钵钵鸡': 'high', '小龙虾/卤味小吃': 'red',
+  '现卤鸭货': 'high', '紫燕百味鸡/凉拌菜': 'stable', '海鲜卤味': 'high', '热卤/卤味火锅菜': 'high',
+  '现炒快餐': 'stable', '木桶饭/煲仔饭': 'stable', '黄焖鸡米饭': 'red', '港式烧腊/深井烧鹅': 'stable',
+  '概念川菜/水煮鱼': 'red', '地道湘菜/辣椒炒肉': 'red', '酸菜鱼/沸腾鱼': 'red',
+  '广式早茶/点心': 'stable', '港式茶餐厅': 'stable', '粤菜生鲜/打边炉': 'stable',
+  '东北菜/铁锅炖': 'stable', '西北菜/烤羊肉串': 'stable', '北京烤鸭/京味菜': 'red',
+  '重庆老火锅': 'red', '成都清油火锅': 'red', '盘盘麻辣烫/串串香': 'red',
+  '潮汕牛肉火锅': 'high', '海南椰子鸡': 'high', '台式麻辣/番茄锅': 'high', '猪肚鸡/打边炉': 'stable',
+  '旋转小火锅': 'red', '回转自助火锅': 'red', '一人食火锅': 'high',
+  '新中式烘焙/麻薯/蛋黄酥': 'high', '传统桃酥/绿豆糕': 'stable', '现烤糕点': 'high',
+  '奶油生日蛋糕': 'stable', '巴斯克/切片蛋糕': 'high', '法式甜品/可颂': 'stable', '舒芙蕾/泡芙': 'high',
+  // 健康
+  '中医推拿/正骨': 'stable', '艾灸/拔罐': 'blue', '刮痧/熏蒸': 'blue', '药食同源茶饮/膏方': 'high',
+  '沉浸式头疗/洗头': 'blue', '专业采耳/耳道护理': 'blue', '面部SPA': 'high',
+  '泰式古法按摩': 'stable', '日式指压': 'stable', '精油SPA': 'high', '足道采耳': 'blue',
+  '24h自助健身房': 'high', '精品团课工作室': 'high', '私教一对一工作室': 'stable',
+  '普拉提/瑜伽工作室': 'high', '拳击/格斗馆': 'high', '羽毛球/网球馆': 'stable', '室内滑雪/攀岩': 'blue',
+  '运动康复/肌骨损伤恢复': 'blue', '产后修复/体态矫正': 'blue',
+  // 服务
+  '发型设计/烫染': 'red', '头皮理疗/洗护': 'high', '快剪/男士理发': 'high',
+  '日系美甲': 'red', '美睫嫁接': 'high', '手足护理': 'stable',
+  '科技美肤/清洁': 'high', '抗衰提拉/水光': 'high', '祛痘/敏感肌修护': 'high',
+  '半永久纹眉/纹唇': 'high', '新娘妆/日常造型': 'stable',
+  '按时保洁': 'blue', '新房开荒保洁': 'stable', '开工深度清洁': 'stable',
+  '空调清洗': 'stable', '抽油烟机清洗': 'stable', '洗衣机/冰箱消毒': 'stable',
+  '上门干洗/洗鞋': 'high', '全屋收纳整理': 'blue', '软装除螨': 'high',
+  '猫狗洗澡/造型': 'stable', '宠物SPA/寄养': 'high',
+  '宠物医院/疫苗': 'high', '宠物体检/绝育': 'stable',
+  // 教育
+  '少儿美术/书法': 'stable', '钢琴/古筝/吉他': 'stable', '少儿舞蹈/芭蕾': 'stable',
+  '少儿编程/机器人': 'high', '科学实验/乐高构筑': 'high',
+  '少儿主持/演讲': 'stable', '少儿英语/戏剧': 'stable',
+  '少儿篮球/足球': 'stable', '体能训练/平衡车': 'high', '少儿跆拳道/游泳': 'high',
+  '0-3岁早教中心': 'stable', '日托/半日托': 'high',
+  // 培训
+  'AI应用/Prompt工程': 'blue', '短视频剪辑/运营': 'high', '直播带货/电商运营': 'high',
+  '前端/后端开发': 'high', '数据分析/Python': 'high', '软件测试/UI设计': 'stable',
+  '咖啡师/调酒师培训': 'high', '西点烘焙培训': 'high', '轻食/餐饮创业培训': 'blue',
+  '国考/省考培训': 'red', '教师资格证': 'red', '事业单位统考': 'red',
+  '注册会计师(CPA)': 'red', '执业医师/药师': 'high', '健康管理师/心理咨询师': 'blue',
+  // 设计
+  '品牌VI/门店空间设计': 'blue', '网红茶饮/咖啡店设计': 'high',
+  '服装品牌专卖店': 'stable', '展示体验馆/展厅设计': 'high',
+  '现代简约风设计': 'stable', '新中式/法式复古设计': 'high', '全屋定制排布': 'stable',
+  '厨卫翻新设计': 'high', '阳台/儿童房改建': 'high',
+  'Logo/VI视觉系统': 'stable', '产品包装/礼盒设计': 'high', '宣传册/海报设计': 'stable',
+  // 医疗
+  '隐形/金属牙齿矫正': 'high', '种植牙': 'high', '超声波洁牙/冷光美白': 'high',
+  '近视屈光手术(全飞秒/半飞秒)': 'high', '角膜塑形镜(OK镜)': 'high', '青少年近视防控': 'high',
+  '玻尿酸填充': 'high', '肉毒素瘦脸/除皱': 'high', '光电皮秒/热玛吉': 'high',
+  '眼部综合/鼻部综合': 'high', '吸脂/形体雕塑': 'high',
+  // 金融
+  '代理记账/报税': 'stable', '公司注册/变更': 'stable', '商标/知识产权代理': 'high',
+  '税务筹划/合规': 'blue', '财务审计/验资': 'stable', '高企认定申报': 'high',
+  '抵押贷/信用贷咨询': 'stable', '经营贷/供应链金融': 'high',
+  '房贷/车贷咨询': 'stable', '保险规划/理财咨询': 'blue',
+};
+
+/* ---------- 三级赛道代表性爆品库（预置 2~3 个招牌爆品） ----------
+ * 未命中的赛道由 genHitProducts 依据赛道名 + 品类词库确定性生成。
+ */
+const SIGNATURE = {
+  catering: {
+    '鲜果茶': ['多肉葡萄鲜果茶', '杨梅吐气', '满杯红柚'],
+    '轻乳茶/原叶鲜奶茶': ['芝芝芒芒', '黑糖珍珠鲜奶', '茉莉奶绿'],
+    '手打柠檬茶': ['鸭屎香柠檬茶', '泰式绿柠檬', '暴打渣男绿'],
+    '纯茶/功夫茶': ['凤凰单丛', '正山小种', '老白茶'],
+    '生椰/生酪拿铁': ['生椰拿铁', '生酪拿铁', '丝绒拿铁'],
+    '果咖/气泡咖': ['橙C美式', '苹果气泡美式', '莓莓冷萃'],
+    '冷萃/冰滴咖啡': ['椰青冷萃', '柚见冰滴', '燕麦丝绒冷萃'],
+    '螺蛳粉': ['加辣加臭螺蛳粉', '炸蛋螺蛳粉', '卤味拼盘'],
+    '黄焖鸡米饭': ['招牌黄焖鸡', '香菇滑鸡饭', '藤椒鸡饭'],
+    '重庆老火锅': ['麻辣牛油锅底', '鲜毛肚', '现切黄喉'],
+    '潮汕牛肉火锅': ['吊龙伴', '匙柄', '手打牛丸'],
+    '海南椰子鸡': ['文昌椰子鸡锅', '椰子水涮菜', '海南鸡饭'],
+    '新中式烘焙/麻薯/蛋黄酥': ['麻薯欧包', '流心蛋黄酥', '芝芝芒芒软欧'],
+    '巴斯克/切片蛋糕': ['巴斯克芝士蛋糕', '生椰拿铁千层', '脏脏可可'],
+    '奶油生日蛋糕': ['动物奶油水果蛋糕', '低糖慕斯', '巧克力榛果'],
+  },
+  education: {
+    '少儿编程/机器人': ['Scratch启蒙课', 'Python创意编程', '机器人竞技营'],
+    '少儿美术/书法': ['创意水墨课', '硬笔书法营', '国画启蒙'],
+  },
+  training: {
+    'AI应用/Prompt工程': ['AI办公提效训练营', 'Prompt实战工作坊', 'AI数字分身课'],
+    '短视频剪辑/运营': ['剪映爆款课', '抖音起号陪跑', '直播带货实训'],
+    '直播带货/电商运营': ['0基础直播课', '千川投流实战', '达人孵化营'],
+    '咖啡师/调酒师培训': ['意式咖啡系统课', '拉花艺术班', '调酒师认证'],
+    '西点烘焙培训': ['法式甜点课', '软欧包专修', '私房蛋糕创业'],
+  },
+  health: {
+    '艾灸/拔罐': ['节气艾灸调理', '葫芦灸', '肩颈拔罐'],
+    '药食同源茶饮/膏方': ['熬夜元气茶', '阿胶糕', '祛湿轻饮'],
+    '精油SPA': ['芳香精油开背', '头肩颈SPA', '全身淋巴排毒'],
+    '普拉提/瑜伽工作室': ['器械普拉提', '孕产修复瑜伽', '空中瑜伽'],
+    '产后修复/体态矫正': ['腹直肌修复', '骨盆矫正', '体态评估'],
+  },
+  service: {
+    '日系美甲': ['穿戴甲定制', '日式极致单色', '晕染款式'],
+    '科技美肤/清洁': ['小气泡清洁', '光子嫩肤', '海菲秀'],
+    '抗衰提拉/水光': ['水光针', '超声炮', '热玛吉'],
+    '全屋收纳整理': ['全屋收纳规划', '衣橱改造', '搬家整理'],
+    '猫狗洗澡/造型': ['宠物精油SPA浴', '造型修剪', '狗狗美容套餐'],
+    '宠物医院/疫苗': ['年度体检套餐', '猫三联疫苗', '绝育套餐'],
+  },
+  medical: {
+    '隐形/金属牙齿矫正': ['隐形矫正方案', '金属自锁矫正', '儿童早期干预'],
+    '种植牙': ['种植牙评估', '即刻种植', 'All-on-4'],
+    '玻尿酸填充': ['法令纹填充', '苹果肌塑形', '轮廓固定'],
+    '肉毒素瘦脸/除皱': ['瘦脸针', '除皱针', '下颌缘提升'],
+  },
+  finance: {
+    '代理记账/报税': ['小规模纳税人代账', '一般纳税人套餐', '汇算清缴'],
+    '税务筹划/合规': ['个独核定筹划', '股权架构设计', '税务健康体检'],
+    '保险规划/理财咨询': ['家庭保障方案', '教育金规划', '养老规划'],
+  },
+};
+
+/* 生成三级赛道预置爆品（2~3 个）：优先命中 SIGNATURE，否则按赛道名 + 品类词库兜底 */
+function genHitProducts(catId, l3Name, basePrice, r) {
+  const sigMap = SIGNATURE[catId];
+  const sig = sigMap && sigMap[l3Name];
+  const pb = PRODUCT_BANK[catId] || PRODUCT_BANK.catering;
+  let names;
+  if (sig && sig.length) {
+    names = sig.slice();
+  } else {
+    const core = l3Name.split('/')[0];
+    names = [core + '·招牌', core + '·人气款'];
+  }
+  while (names.length < 2) names.push(pick(pb, r));
+  names = names.slice(0, 3);
+  return names.map(n => ({
+    name: n,
+    price: Math.max(1, Math.round(basePrice * (0.6 + 0.6 * r()))),
+    tag: pick(['招牌', '热销', '新品', '爆款', '引流', '人气'], r),
+  }));
+}
+
 function fallbackGap(name, gapType, bank, r) {
   const t = {
     '人群空位': `聚焦头部忽视的「${pick(bank.aud, r)}」，做差异化人群定位`,
@@ -803,12 +910,18 @@ function fallbackGap(name, gapType, bank, r) {
 
 function fallbackStrategy(catId, name, ocean, r) {
   const bank = CAT_BANKS[catId] || CAT_BANKS.catering;
-  const gapType = pick(GAP_TYPES, r);
+  // 战略空位类型与热度标签联动：蓝海偏人群/场景，红海偏特性/价格，高潜偏特性/场景
+  const gapType =
+    ocean === 'blue' ? pick(['人群空位', '场景空位'], r)
+    : ocean === 'high' ? pick(['特性空位', '场景空位'], r)
+    : ocean === 'red'  ? pick(['特性空位', '价格空位'], r)
+    : pick(['价格空位', '场景空位'], r);
+  const core = name.split('/')[0];
   return {
-    competitors: [{ name: pick(bank.comp, r).split('以')[0].replace(/头部|网红|老字号|大厂|在线|考证|连锁|平台|4A|工作室|传统|大厂财税|顾问|公立|小微/g, '').slice(0, 6) || '头部品牌', mind: pick(bank.comp, r) }],
+    competitors: [{ name: pick(bank.comp, r).split('以')[0].replace(/头部|网红|老字号|大厂|在线|考证|连锁|平台|4A|工作室|传统|大厂财税|顾问|公立|小微|背景/g, '').slice(0, 6) || '头部品牌', mind: pick(bank.comp, r) }],
     painPoints: [pick(bank.pain, r), pick(bank.pain, r)],
     weaknesses: [pick(bank.weak, r), pick(bank.weak, r)],
-    gap: fallbackGap(name, gapType, bank, r),
+    gap: `围绕「${core}」，` + fallbackGap(name, gapType, bank, r),
     gapType: gapType,
   };
 }
@@ -823,9 +936,10 @@ function genBase(catId, l3Id, name) {
   const penetration = +rnd(5, 65).toFixed(1);           // 渗透率 %
   const price = Math.round(rnd(15, 580));               // 客单价（元/课程/项目基准）
   const repurchase = +rnd(15, 78).toFixed(1);           // 复购率 %
-  const ocean = growth >= 12 && competition < 0.6 ? 'blue'
+  // 热度标签：优先采用显式 HEAT_TAG，缺失时回退数值推导
+  const ocean = HEAT_TAG[name] || (growth >= 12 && competition < 0.6 ? 'blue'
               : growth >= 12 && competition >= 0.6 ? 'high'
-              : growth < 8 && competition >= 0.7 ? 'red' : 'stable';
+              : growth < 8 && competition >= 0.7 ? 'red' : 'stable');
   // 12 个月趋势（带增长漂移）
   let cur = (marketSize / 12) * 0.7;
   const trend = [];
@@ -835,7 +949,9 @@ function genBase(catId, l3Id, name) {
   const topBrands = [0, 1, 2].map(i => ({ name: bn[(i + Math.floor(r() * bn.length)) % bn.length], share: +(i === 0 ? rnd(12, 34) : rnd(3, 12)).toFixed(1) }));
   const persona = pick(PERSONA_BANKS[catId] || PERSONA_BANKS.catering, r);
   const strategy = fallbackStrategy(catId, name, ocean, r);
-  return { marketSize, growth, competition, penetration, price, repurchase, ocean, trend, topBrands, persona, strategy };
+  // 预置代表性爆品（2~3 个）
+  const hitProducts = genHitProducts(catId, name, price, r);
+  return { marketSize, growth, competition, penetration, price, repurchase, ocean, trend, topBrands, persona, strategy, hitProducts };
 }
 
 /* ---------- 精选战略空位（示例赛道，覆盖用户给定结构） ---------- */
@@ -853,7 +969,7 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
-    '冰吸柠檬茶': {
+    '手打柠檬茶': {
       marketSize: 95, growth: 22, competition: 0.6, penetration: 18, price: 16, repurchase: 40, ocean: 'high',
       topBrands: [{ name: '丘大叔', share: 14.1 }, { name: '邻居柠檬茶', share: 9.8 }, { name: '本地手打', share: 8.2 }],
       persona: 'Z世代学生党，重清爽解腻与高性价比',
@@ -877,7 +993,7 @@ const CURATED = {
         gapType: '场景空位',
       },
     },
-    '牛肉面': {
+    '兰州拉面': {
       marketSize: 120, growth: 6, competition: 0.66, penetration: 48, price: 26, repurchase: 55, ocean: 'stable',
       topBrands: [{ name: '马子禄', share: 9.2 }, { name: '本地老碗', share: 7.5 }, { name: '陈香贵', share: 6.8 }],
       persona: '全龄刚需客群，重汤头与饱腹',
@@ -889,9 +1005,69 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
+    '生椰/生酪拿铁': {
+      marketSize: 240, growth: 30, competition: 0.72, penetration: 28, price: 21, repurchase: 52, ocean: 'high',
+      topBrands: [{ name: '瑞幸', share: 26.3 }, { name: '库迪', share: 15.4 }, { name: '幸运咖', share: 9.1 }],
+      persona: '18-35岁上班族，咖啡刚需+奶香偏好',
+      strategy: {
+        competitors: [{ name: '瑞幸/库迪', mind: '以「9.9高频+生椰大单品」占据性价比咖啡心智' }],
+        painPoints: ['口味雷同、易腻', '品控不稳', '价格战内卷'],
+        weaknesses: ['大单品依赖、创新乏力', '门店密度过高'],
+        gap: '以「小众风味+现制生酪/燕麦」切入品质差异化空位',
+        gapType: '特性空位',
+      },
+    },
+    '重庆老火锅': {
+      marketSize: 320, growth: 8, competition: 0.86, penetration: 55, price: 110, repurchase: 48, ocean: 'red',
+      topBrands: [{ name: '海底捞', share: 18.2 }, { name: '巴奴', share: 12.6 }, { name: '本地老火锅', share: 9.3 }],
+      persona: '全龄聚餐客群，重麻辣社交',
+      strategy: {
+        competitors: [{ name: '巴奴/海底捞', mind: '以「服务/毛肚品质」占据火锅心智' }],
+        painPoints: ['排队久', '同质化严重', '人均高'],
+        weaknesses: ['重资产、标准化牺牲锅底个性', '翻台率压力'],
+        gap: '以「社区小锅+区域特色底料」切入近场高频空位',
+        gapType: '场景空位',
+      },
+    },
+    '潮汕牛肉火锅': {
+      marketSize: 140, growth: 18, competition: 0.6, penetration: 22, price: 120, repurchase: 46, ocean: 'high',
+      topBrands: [{ name: '八合里', share: 14.7 }, { name: '海记', share: 11.2 }, { name: '本地潮汕店', share: 8.0 }],
+      persona: '注重食材新鲜的品质客群',
+      strategy: {
+        competitors: [{ name: '八合里/海记', mind: '以「现宰黄牛+部位专精」占据鲜牛肉心智' }],
+        painPoints: ['新鲜度难保障', '蘸料单一', '价格偏高'],
+        weaknesses: ['供应链要求高、难下沉', '损耗大'],
+        gap: '以「部位套餐+明档现切」切入鲜度信任空位',
+        gapType: '特性空位',
+      },
+    },
+    '海南椰子鸡': {
+      marketSize: 70, growth: 20, competition: 0.55, penetration: 14, price: 130, repurchase: 44, ocean: 'high',
+      topBrands: [{ name: '润园四季', share: 13.3 }, { name: '同仁四季', share: 9.8 }, { name: '本地椰子鸡', share: 7.5 }],
+      persona: '家庭/养生客群，重清淡健康',
+      strategy: {
+        competitors: [{ name: '椰子鸡连锁', mind: '以「清润养生+海南食材」占据清淡火锅心智' }],
+        painPoints: ['锅底偏甜接受度分化', '供给少', '客单高'],
+        weaknesses: ['区域局限（华南）', '标准难统一'],
+        gap: '以「椰子水+轻养生套餐」切入南北通吃空位',
+        gapType: '人群空位',
+      },
+    },
+    '新中式烘焙/麻薯/蛋黄酥': {
+      marketSize: 110, growth: 24, competition: 0.7, penetration: 20, price: 25, repurchase: 42, ocean: 'high',
+      topBrands: [{ name: '泸溪河', share: 15.6 }, { name: '鲍师傅', share: 12.1 }, { name: '墨茉点心局', share: 7.4 }],
+      persona: '年轻女性，国潮点心+打卡',
+      strategy: {
+        competitors: [{ name: '泸溪河/鲍师傅', mind: '以「现烤排队+国潮点心」占据心智' }],
+        painPoints: ['保质短、易浪费', '热量顾虑', '品牌更迭快'],
+        weaknesses: ['扩张牺牲新鲜度', '同质化'],
+        gap: '以「短保健康+区域限定口味」切入轻养生空位',
+        gapType: '特性空位',
+      },
+    },
   },
   education: {
-    '儿童少儿美术': {
+    '少儿美术/书法': {
       marketSize: 140, growth: 8, competition: 0.55, penetration: 22, price: 120, repurchase: 60, ocean: 'stable',
       topBrands: [{ name: '美术宝', share: 17.3 }, { name: '番茄少儿', share: 12.6 }, { name: '本地画室', share: 10.1 }],
       persona: '3-12岁家长，重审美素养与升学加分',
@@ -903,7 +1079,7 @@ const CURATED = {
         gapType: '人群空位',
       },
     },
-    '少儿编程': {
+    '少儿编程/机器人': {
       marketSize: 210, growth: 18, competition: 0.62, penetration: 19, price: 150, repurchase: 58, ocean: 'high',
       topBrands: [{ name: '编程猫', share: 21.2 }, { name: '西瓜创客', share: 14.5 }, { name: '核桃', share: 9.3 }],
       persona: '7-14岁家长，重逻辑思维与未来竞争力',
@@ -917,7 +1093,7 @@ const CURATED = {
     },
   },
   training: {
-    'AI应用培训': {
+    'AI应用/Prompt工程': {
       marketSize: 90, growth: 35, competition: 0.45, penetration: 8, price: 2980, repurchase: 30, ocean: 'blue',
       topBrands: [{ name: '三节课', share: 16.8 }, { name: '腾讯课堂', share: 13.2 }, { name: '开课吧', share: 10.5 }],
       persona: '22-35岁职场人，谋求AI提效与转岗',
@@ -929,7 +1105,7 @@ const CURATED = {
         gapType: '场景空位',
       },
     },
-    '短视频带货': {
+    '直播带货/电商运营': {
       marketSize: 130, growth: 40, competition: 0.7, penetration: 12, price: 1999, repurchase: 25, ocean: 'high',
       topBrands: [{ name: '交个朋友', share: 12.1 }, { name: '本地MCN', share: 9.4 }, { name: '达人孵化', share: 8.0 }],
       persona: '小微企业主/个体，想做线上生意',
@@ -943,7 +1119,7 @@ const CURATED = {
     },
   },
   health: {
-    '艾灸': {
+    '艾灸/拔罐': {
       marketSize: 95, growth: 16, competition: 0.5, penetration: 15, price: 98, repurchase: 62, ocean: 'blue',
       topBrands: [{ name: '固生堂', share: 12.4 }, { name: '同仁堂', share: 10.8 }, { name: '社区艾灸馆', share: 8.1 }],
       persona: '25-50岁亚健康白领与银发族',
@@ -955,7 +1131,7 @@ const CURATED = {
         gapType: '场景空位',
       },
     },
-    '药食茶饮': {
+    '药食同源茶饮/膏方': {
       marketSize: 60, growth: 26, competition: 0.55, penetration: 9, price: 28, repurchase: 48, ocean: 'high',
       topBrands: [{ name: '同仁堂健康', share: 15.0 }, { name: '草本茶新锐', share: 10.3 }, { name: '本地养生铺', share: 7.1 }],
       persona: '养生青年，重内调与便捷',
@@ -969,7 +1145,7 @@ const CURATED = {
     },
   },
   service: {
-    '上门家政清洁': {
+    '按时保洁': {
       marketSize: 150, growth: 20, competition: 0.4, penetration: 14, price: 199, repurchase: 70, ocean: 'blue',
       topBrands: [{ name: '天鹅到家', share: 18.9 }, { name: '58到家', share: 14.2 }, { name: '京东服务', share: 9.6 }],
       persona: '双职工家庭，家政刚需',
@@ -981,7 +1157,7 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
-    '收纳整理': {
+    '全屋收纳整理': {
       marketSize: 70, growth: 24, competition: 0.42, penetration: 7, price: 299, repurchase: 55, ocean: 'blue',
       topBrands: [{ name: '留存道', share: 12.3 }, { name: '本地收纳师', share: 8.8 }, { name: '家政平台', share: 7.0 }],
       persona: '中产家庭，重空间与秩序',
@@ -995,7 +1171,7 @@ const CURATED = {
     },
   },
   design: {
-    '餐饮门面设计': {
+    '品牌VI/门店空间设计': {
       marketSize: 55, growth: 16, competition: 0.48, penetration: 11, price: 8000, repurchase: 20, ocean: 'blue',
       topBrands: [{ name: '古田路9号', share: 11.0 }, { name: '洛可可', share: 9.2 }, { name: '本地设计工作室', share: 7.5 }],
       persona: '连锁/初创餐饮品牌方',
@@ -1007,7 +1183,7 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
-    '展厅设计': {
+    '展示体验馆/展厅设计': {
       marketSize: 48, growth: 12, competition: 0.5, penetration: 9, price: 30000, repurchase: 15, ocean: 'stable',
       topBrands: [{ name: '风语筑', share: 13.4 }, { name: '本地展陈', share: 8.1 }, { name: '策划工作室', share: 6.0 }],
       persona: '商业地产/政府/品牌方',
@@ -1021,7 +1197,7 @@ const CURATED = {
     },
   },
   medical: {
-    '牙齿矫正': {
+    '隐形/金属牙齿矫正': {
       marketSize: 200, growth: 15, competition: 0.65, penetration: 13, price: 18000, repurchase: 10, ocean: 'high',
       topBrands: [{ name: '通策医疗', share: 16.8 }, { name: '拜博', share: 12.3 }, { name: '隐形矫正新锐', share: 10.1 }],
       persona: '18-35岁消费医疗人群',
@@ -1033,7 +1209,7 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
-    '眼科屈光': {
+    '近视屈光手术(全飞秒/半飞秒)': {
       marketSize: 180, growth: 17, competition: 0.6, penetration: 12, price: 15000, repurchase: 8, ocean: 'high',
       topBrands: [{ name: '爱尔眼科', share: 19.5 }, { name: '普瑞', share: 11.2 }, { name: '华夏', share: 8.0 }],
       persona: '18-40岁摘镜需求人群',
@@ -1045,9 +1221,21 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
+    '玻尿酸填充': {
+      marketSize: 160, growth: 21, competition: 0.68, penetration: 10, price: 3800, repurchase: 28, ocean: 'high',
+      topBrands: [{ name: '艺星', share: 12.4 }, { name: '美莱', share: 10.1 }, { name: '本地轻医美', share: 8.0 }],
+      persona: '25-40岁颜值管理人群',
+      strategy: {
+        competitors: [{ name: '连锁医美', mind: '以「明星案例/自然款」占据变美心智' }],
+        painPoints: ['怕假面/栓塞', '价格水分大', '机构资质存疑'],
+        weaknesses: ['合规参差', '营销过度'],
+        gap: '以「医师实名+正品可验+自然审美」切入安全信任空位',
+        gapType: '特性空位',
+      },
+    },
   },
   finance: {
-    '代理记账': {
+    '代理记账/报税': {
       marketSize: 240, growth: 10, competition: 0.45, penetration: 30, price: 200, repurchase: 85, ocean: 'stable',
       topBrands: [{ name: '慧算账', share: 14.6 }, { name: '金蝶精斗云', share: 12.0 }, { name: '用友畅捷通', share: 10.3 }],
       persona: '中小微企业与个体户',
@@ -1059,7 +1247,7 @@ const CURATED = {
         gapType: '特性空位',
       },
     },
-    '纳税筹划': {
+    '税务筹划/合规': {
       marketSize: 95, growth: 14, competition: 0.5, penetration: 11, price: 5000, repurchase: 60, ocean: 'blue',
       topBrands: [{ name: '四大背景顾问', share: 9.8 }, { name: '本土税务所', share: 8.2 }, { name: '财税SaaS', share: 7.0 }],
       persona: '高利润企业与创业公司',
@@ -1162,14 +1350,24 @@ function genRegionInsight(catId, l3Id, region) {
   localBrands.push({ name: sn + pick(suffix, r), share: +rnd(5, 14).toFixed(1), local: true });
   localBrands.push({ name: bn[Math.floor(r() * bn.length) % bn.length], share: +rnd(10, 26).toFixed(1), local: false });
   if (r() > 0.5) localBrands.push({ name: bn[Math.floor(r() * bn.length) % bn.length], share: +rnd(5, 14).toFixed(1), local: false });
-  // 区域爆品卡
-  const pb = PRODUCT_BANK[catId] || PRODUCT_BANK.catering;
-  const products = [0, 1, 2].map(() => ({
-    name: (rname.slice(0, 4) || '本地') + pick(pb, r),
-    price: Math.max(1, Math.round(base.price * rnd(0.6, 1.4))),
-    tag: pick(['热销', '新品', '引流', '爆款', '限时'], r),
-    heat: Math.round(rnd(60, 99)),
-  }));
+  // 区域爆品卡（优先使用三级赛道预置爆品，缺省时回退品类词库）
+  let products;
+  if (base.hitProducts && base.hitProducts.length) {
+    products = base.hitProducts.slice(0, 3).map(h => ({
+      name: (rname.slice(0, 4) || '本地') + '·' + h.name,
+      price: Math.max(1, Math.round(h.price * rnd(0.85, 1.15))),
+      tag: h.tag || pick(['热销', '新品', '爆款'], r),
+      heat: Math.round(rnd(62, 99)),
+    }));
+  } else {
+    const pb = PRODUCT_BANK[catId] || PRODUCT_BANK.catering;
+    products = [0, 1, 2].map(() => ({
+      name: (rname.slice(0, 4) || '本地') + pick(pb, r),
+      price: Math.max(1, Math.round(base.price * rnd(0.6, 1.4))),
+      tag: pick(['热销', '新品', '引流', '爆款', '限时'], r),
+      heat: Math.round(rnd(60, 99)),
+    }));
+  }
   // 本地化战略空位
   const s = base.strategy;
   const bank = CAT_BANKS[catId] || CAT_BANKS.catering;
