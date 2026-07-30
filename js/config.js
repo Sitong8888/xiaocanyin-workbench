@@ -20,6 +20,7 @@ window.APP_CONFIG = {
   // 可选：若你的代理需要简单鉴权（建议用一次性/低权限 key）
   liveApiKey: "",
 
-  // 请求超时（毫秒），超时将自动降级为基准数据
-  liveApiTimeout: 6000,
+  // 请求超时（毫秒）：实测智谱「联网检索+抽取」往返约 25~30 秒，故设为 35 秒，
+  // 确保前端在 Worker 返回前不会过早中断降级为基准数据（fetchLiveBrands 读取此值）。
+  liveApiTimeout: 35000,
 };
