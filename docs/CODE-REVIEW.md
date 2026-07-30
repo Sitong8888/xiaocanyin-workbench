@@ -153,16 +153,16 @@ const settle = payload => {
 
 ---
 
-## 三、遗留风险（本次未处理，需团队决策）
+## 三、遗留风险（后续迭代已全部处理 ✅）
 
-| 风险 | 说明 | 建议 |
-|---|---|---|
-| `innerHTML` 依赖人工调用 `esc()` | 目前 25 处全部正确，但**新增第 26 处时无任何机制提醒** | 引入 `html` 标签模板函数，默认转义，从"靠自觉"变成"默认安全" |
-| 无前端错误上报 | 线上 JS 异常静默失败，用户遇到白屏你们不会知道 | 接一个轻量 `window.onerror` 上报到 Worker |
-| Worker 无速率限制 | 代理地址公开，任何人可无限调用，直接消耗你们的博查/智谱额度 | Worker 层加 IP 维度限流（Cloudflare KV 计数即可） |
-| 无 Worker 侧缓存 | 相同"区域+品类"重复查询会重复付费 | KV 缓存 24 小时，命中率预计 > 60%，成本立降 |
+| 风险 | 处理结果 |
+|---|---|
+| `innerHTML` 依赖人工调用 `esc()` | ✅ 已落地 `setHTML()/html\`\`/raw()` 封装（`js/core.js`）：普通字符串默认转义，可信 HTML 必须 `raw()` 显式标记；ESLint `no-restricted-syntax` 全仓禁止直接赋值 `innerHTML/outerHTML/insertAdjacentHTML`，25 处赋值点已全部迁移 |
+| 无前端错误上报 | ✅ 已落地 `initErrorReporting()`（`js/core.js`）：`error` + `unhandledrejection` → 去重 + 每会话限量 10 条 → `sendBeacon/fetch` POST 到 Worker `/log`；`wrangler tail` 实时查看；上报失败静默不影响用户 |
+| Worker 无速率限制 | ✅ 已落地 IP 固定窗口限流（默认 30 次/IP/分钟，`RATE_LIMIT_PER_MIN` 可调）→ 超限 429 + Retry-After；KV 未绑定时放行降级 |
+| 无 Worker 侧缓存 | ✅ 已落地检索词级 KV 缓存：真实榜单缓存 6h、空结果 10min，命中返回 `_meta.cache=hit` 且零上游调用；`nocache=1` 可绕过调试 |
 
-**其中「Worker 无速率限制」建议优先处理**——代理地址已经公开在前端 `config.js` 里，理论上任何人都能拿去刷你们的付费额度。
+> ⚠️ 限流与缓存依赖 KV namespace 绑定（一次性操作，见 `cloudflare/wrangler.toml` 注释三步走）。未绑定前 Worker 自动优雅降级，功能不受影响。回归测试见 `tests/worker-guard.test.js`、`tests/safe-html.test.js`。
 
 ---
 

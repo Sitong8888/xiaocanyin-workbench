@@ -7,7 +7,7 @@
 /* ---------------- 渲染：行业大类下拉 ---------------- */
 function renderCategorySelect() {
   const sel = $('#catSelect');
-  sel.innerHTML = '';
+  setHTML(sel, '');
   CATEGORIES.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
@@ -24,7 +24,7 @@ function gapChip(t) { return `<span class="gap-tag ${'gt-' + GAP_TYPES.indexOf(t
 function renderCascader(group) {
   const panel = $(`.cascader-panel[data-panel="${group}"]`);
   const sel = state[group].sel;
-  panel.innerHTML = '';
+  setHTML(panel, '');
   const mk = (nodes, lv) => {
     const col = document.createElement('div');
     col.className = 'casc-col';
@@ -33,7 +33,7 @@ function renderCascader(group) {
       const isLeaf = lv === 3;
       const ocean = isLeaf ? getAnalytics(state.category, n.id).ocean : null;
       b.className = 'casc-item' + (isLeaf ? ' leaf' : '') + (sel['L' + lv] === n.id ? ' active' : '');
-      b.innerHTML = n.name + (isLeaf ? `<span class="mini ${oceanClass(ocean)}">${oceanText(ocean)}</span>` : '');
+      setHTML(b, raw(n.name + (isLeaf ? `<span class="mini ${oceanClass(ocean)}">${oceanText(ocean)}</span>` : '')));
       b.onclick = () => {
         sel['L' + lv] = n.id;
         for (let k = lv + 1; k <= 3; k++) sel['L' + k] = null;
@@ -57,10 +57,10 @@ function updatePath(group) {
   const path = sel.L3 ? getPath(state.category, sel.L3) : [];
   const target = $(`#path-${group}`);
   if (!target) return;
-  if (!sel.L3) { target.innerHTML = '<span class="ph">未选择</span>'; return; }
+  if (!sel.L3) { setHTML(target, raw('<span class="ph">未选择</span>')); return; }
   const ocean = getAnalytics(state.category, sel.L3).ocean;
-  target.innerHTML = path.map((n, i) => `<span class="pseg ${i === 2 ? oceanClass(ocean) : ''}">${n.name}</span>`).join('<span class="arr">›</span>') +
-    `<span class="mini ${oceanClass(ocean)}">${oceanText(ocean)}</span>`;
+  setHTML(target, raw(path.map((n, i) => `<span class="pseg ${i === 2 ? oceanClass(ocean) : ''}">${n.name}</span>`).join('<span class="arr">›</span>') +
+    `<span class="mini ${oceanClass(ocean)}">${oceanText(ocean)}</span>`));
 }
 
 /* ---------------- 渲染：看板 ---------------- */
@@ -94,7 +94,7 @@ function maybeRender() {
 
 function renderKPI(a, b) {
   const wrap = $('#kpiWrap');
-  wrap.innerHTML = '';
+  setHTML(wrap, '');
   const cards = [];
   const pair = (label, va, vb, unit, suffix) => {
     cards.push({ label, a: va, b: vb, unit, suffix: suffix || '' });
@@ -115,7 +115,7 @@ function renderKPI(a, b) {
     } else {
       html += `<div class="kpi-b muted">（仅主对象）</div>`;
     }
-    el.innerHTML = html;
+    setHTML(el, raw(html));
     wrap.appendChild(el);
   });
 }
@@ -153,7 +153,7 @@ function renderRadar(a, b) {
   svg += poly(a, '#3b82f6', 'rgba(59,130,246,.18)');
   svg += `</svg>`;
   const legend = `<div class="legend"><span class="lg lg-a">● 主对象 A</span>${b ? '<span class="lg lg-b">● 对比 B</span>' : ''}</div>`;
-  wrap.innerHTML = svg + legend;
+  setHTML(wrap, raw(svg + legend));
 }
 
 /* 双向交叉矩阵：维度 × (A/B) 对比条 */
@@ -177,7 +177,7 @@ function renderMatrix(a, b) {
     html += `</div>`;
   });
   html += '</div>';
-  wrap.innerHTML = html;
+  setHTML(wrap, raw(html));
 }
 
 /* 趋势折线：近 12 个月 A/B */
@@ -205,5 +205,5 @@ function renderLine(a, b) {
   svg += '</svg>';
   const legend = `<div class="legend"><span class="lg lg-a">● 主对象(近12月)</span>${b ? '<span class="lg lg-b">● 对比 B</span>' : ''}</div>` +
     `<div class="line-note">单位：亿元/月 · ${state.region.prov ? '已按区域系数 ×' + a.regionMod + ' 调整' : '全国基准'}</div>`;
-  wrap.innerHTML = svg + legend;
+  setHTML(wrap, raw(svg + legend));
 }

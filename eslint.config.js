@@ -37,6 +37,9 @@ const JS_MODULE_API = {
   oceanText: 'readonly', oceanClass: 'readonly', getSel: 'readonly', primaryL3: 'readonly',
   esc: 'readonly', APP_CONFIG: 'readonly', LIVE_TIMEOUT: 'readonly',
   liveViewKey: 'readonly', liveAbort: 'writable',
+  raw: 'readonly', html: 'readonly', setHTML: 'readonly',
+  ERR_REPORT: 'readonly', errReportEndpoint: 'readonly',
+  reportClientError: 'readonly', initErrorReporting: 'readonly',
   // live.js
   buildLiveQuery: 'readonly', FAKE_RE: 'readonly', isFakeBrand: 'readonly',
   normLiveBrand: 'readonly', tagClass: 'readonly', fetchLiveBrands: 'readonly',
@@ -106,7 +109,26 @@ export default [
     },
     // 多文件经典 <script> 共享全局作用域：顶层函数被其它文件引用属正常"导出"，
     // 故 no-unused-vars 仅查函数内局部变量（vars:'local'），避免误报。
-    rules: { ...CORE_RULES, 'no-unused-vars': ['error', { args: 'none', vars: 'local', varsIgnorePattern: '^_' }] },
+    rules: {
+      ...CORE_RULES,
+      'no-unused-vars': ['error', { args: 'none', vars: 'local', varsIgnorePattern: '^_' }],
+      // —— XSS 护栏：禁止绕过 SafeHTML 封装直接写 DOM HTML ——
+      // 唯一合法写入点是 core.js 的 setHTML（内部有 eslint-disable 标注 + 代码评审覆盖）。
+      'no-restricted-syntax': ['error',
+        {
+          selector: "AssignmentExpression[left.property.name='innerHTML']",
+          message: '禁止直接赋值 innerHTML — 请使用 setHTML(el, html`...`) 或 setHTML(el, raw(已审计HTML))（core.js，默认转义）',
+        },
+        {
+          selector: "AssignmentExpression[left.property.name='outerHTML']",
+          message: '禁止直接赋值 outerHTML — 请使用 setHTML 封装（core.js，默认转义）',
+        },
+        {
+          selector: "CallExpression[callee.property.name='insertAdjacentHTML']",
+          message: '禁止 insertAdjacentHTML — 请使用 setHTML 封装（core.js，默认转义）',
+        },
+      ],
+    },
   },
 
   // 边缘/无服务端函数与测试：ESM

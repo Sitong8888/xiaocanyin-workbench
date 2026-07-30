@@ -7,7 +7,7 @@
 /* ---------------- 渲染：区域级联 ---------------- */
 function renderRegionPanel() {
   const panel = $('#regionPanel');
-  panel.innerHTML = '';
+  setHTML(panel, '');
   const mk = (items, onPick, activeId, cls) => {
     const col = document.createElement('div');
     col.className = 'casc-col ' + (cls || '');
@@ -65,18 +65,18 @@ function renderRegionEff() {
   const label = regionLabel();
   if (!label) {
     banner.className = 'region-banner empty';
-    banner.innerHTML = '📍 未选择区域 · 当前显示<b>全国基准</b>数据（选择省/市/区可查看定制化市场规模 / 热度 / 爆品标签）';
+    setHTML(banner, raw('📍 未选择区域 · 当前显示<b>全国基准</b>数据（选择省/市/区可查看定制化市场规模 / 热度 / 爆品标签）'));
     return;
   }
   const p = getRegionProf(state.region.prov.id);
   banner.className = 'region-banner';
-  banner.innerHTML =
+  setHTML(banner, raw(
     `<div class="rb-main">📍 <b>${label}</b></div>` +
     `<div class="rb-tags">` +
       `<span class="rb-chip">区域系数 ×${p.sizeMod}</span>` +
       `<span class="rb-chip heat-${p.heat}">热度：${p.heat}</span>` +
       p.tags.map(t => `<span class="rb-chip tag">#${t}</span>`).join('') +
-    `</div>`;
+    `</div>`));
 }
 
 function closeRegionPanel() { $('#regionPanel').classList.remove('open'); $('#regionPick').textContent = '选择区域 ▾'; }
@@ -171,12 +171,12 @@ function refreshRegionInsight() {
   const label = regionLabel();
   if (!prov) {
     box.className = 'region-insight';
-    box.innerHTML = `<div class="ri-ph">🌐 未选择区域 — 选择省 / 市 / 区（县）后，将触发<b>联网实时查询</b>，刷新该区域的：市场热度 · 竞争指数 · 本地 TOP 品牌 · 爆品 · 本地化战略空位。</div>`;
+    setHTML(box, raw(`<div class="ri-ph">🌐 未选择区域 — 选择省 / 市 / 区（县）后，将触发<b>联网实时查询</b>，刷新该区域的：市场热度 · 竞争指数 · 本地 TOP 品牌 · 爆品 · 本地化战略空位。</div>`));
     return;
   }
   if (!l3Id) {
     box.className = 'region-insight';
-    box.innerHTML = `<div class="ri-ph">📍 已选区域 <b>${esc(label)}</b> — 请选择一个三级行业，立即触发该区域的实时市场洞察。</div>`;
+    setHTML(box, html`<div class="ri-ph">📍 已选区域 <b>${label}</b> — 请选择一个三级行业，立即触发该区域的实时市场洞察。</div>`);
     return;
   }
   const ins = genRegionInsight(state.category, l3Id, state.region);
@@ -185,7 +185,7 @@ function refreshRegionInsight() {
   if (useLive) {
     // Loading 态：先渲染骨架，再异步拉取实时数据
     box.className = 'region-insight loading';
-    box.innerHTML = regionInsightShell(ins, { loading: true, query });
+    setHTML(box, raw(regionInsightShell(ins, { loading: true, query })));
     // 竞态守卫：以「行业大类+省+市+区+三级行业」完整指纹为准（任一维度变化即视为已切换）
     const token = liveViewKey();
     // 取消上一次仍在途的请求：既防止过期响应，也避免博查/智谱的付费额度被空烧
@@ -195,7 +195,7 @@ function refreshRegionInsight() {
     const settle = payload => {
       if (liveViewKey() !== token) return;   // 视图已切换 → 丢弃过期结果
       if (liveAbort === ctrl) liveAbort = null;
-      box.innerHTML = regionInsightShell(ins, payload);
+      setHTML(box, raw(regionInsightShell(ins, payload)));
       box.classList.remove('loading');
     };
     fetchLiveBrands(query, ctrl)
@@ -203,7 +203,7 @@ function refreshRegionInsight() {
       .catch(() => settle({ fallback: true }));
   } else {
     box.className = 'region-insight';
-    box.innerHTML = regionInsightShell(ins, {});
+    setHTML(box, raw(regionInsightShell(ins, {})));
   }
 }
 
@@ -248,14 +248,14 @@ function renderStrategy(a, b) {
 
   if (!aId && !bId) {
     tabs.hidden = true; single.hidden = false; compare.hidden = false;
-    single.innerHTML = '<div class="ph">请选择分析对象以查看战略空位分析</div>';
-    compare.innerHTML = '';
+    setHTML(single, raw('<div class="ph">请选择分析对象以查看战略空位分析</div>'));
+    setHTML(compare, '');
     return;
   }
   tabs.hidden = false;
   let cur = (tabs.dataset.tab) || (canCompare ? 'compare' : 'single');
   if (cur === 'compare' && !canCompare) cur = 'single';
-  tabs.innerHTML = '';
+  setHTML(tabs, '');
   const mkTab = (key, label) => {
     const t = document.createElement('button');
     t.className = 'strat-tab' + (cur === key ? ' active' : '');
@@ -268,13 +268,13 @@ function renderStrategy(a, b) {
 
   if (cur === 'compare' && canCompare) {
     single.hidden = true; compare.hidden = false;
-    compare.innerHTML = `<div class="cmp-grid">` +
+    setHTML(compare, raw(`<div class="cmp-grid">` +
       `<div class="cmp-col">${strategyBlock(cat, aId, 'A')}</div>` +
       `<div class="cmp-col">${strategyBlock(cat, bId, 'B')}</div>` +
-      `</div>` + diffInsight(cat, aId, bId);
+      `</div>` + diffInsight(cat, aId, bId)));
   } else {
     single.hidden = false; compare.hidden = true;
-    single.innerHTML = strategyBlock(cat, aId || bId, aId ? 'A' : 'B');
+    setHTML(single, raw(strategyBlock(cat, aId || bId, aId ? 'A' : 'B')));
   }
 }
 
@@ -308,7 +308,7 @@ function openDrawer() {
       <div class="prod-bar"><span style="width:${br.share * 2.6}%"></span></div>
       <div class="prod-tags">${state.region.prov ? ana.regionTags.slice(0, 2).map(t => `<i class="ptag">#${t}</i>`).join('') : '<i class="ptag">全国基准</i>'}</div>
     </div>`).join('');
-  $('#drawerBody').innerHTML = `
+  setHTML($('#drawerBody'), raw(`
     <div class="drawer-title">${path} <span class="mini ${oceanClass(ocean)}">${oceanText(ocean)}</span></div>
     ${regionChip}
     <div class="drawer-sub">🏆 代表品牌 / 爆品（按市占）</div>
@@ -319,7 +319,7 @@ function openDrawer() {
     <div class="drawer-sub">👥 人群画像</div>
     <div class="drawer-persona">${ana.persona}</div>
     <div class="drawer-sub">🎯 战略空位</div>
-    <div class="drawer-gap">${ana.strategy.gap} ${gapChip(ana.strategy.gapType)}</div>`;
+    <div class="drawer-gap">${ana.strategy.gap} ${gapChip(ana.strategy.gapType)}</div>`));
   $('#drawerMask').classList.add('show');
   $('#drawer').classList.add('show');
 }

@@ -9,3 +9,17 @@ workers_dev = true
 #   npx wrangler secret put ZHIPU_API_KEY
 #
 # Worker 内部已默认开启智谱联网搜索（web_search 工具），无需额外搜索 API Key。
+
+# ---------- KV：限流计数 + 查询结果缓存（未绑定时 Worker 自动优雅降级） ----------
+# 开启步骤（一次性，需 CLOUDFLARE_API_TOKEN）：
+#   1. npx wrangler kv namespace create BRAND_CACHE   ← 输出一个 id
+#   2. 取消下面两行注释，把 id 换成上一步输出的值
+#   3. npx wrangler deploy
+# 未开启时 Worker 自动降级：限流放行、缓存跳过，业务完全不受影响。
+# [[kv_namespaces]]
+# binding = "BRAND_CACHE"
+# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# 可选调参（不设走默认值：30 次/IP/分钟；命中缓存 6h、空结果 10min）
+# [vars]
+# RATE_LIMIT_PER_MIN = "30"

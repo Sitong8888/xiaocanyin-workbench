@@ -69,6 +69,7 @@ function initDefault() {
 }
 
 function boot() {
+  initErrorReporting();   // 尽早挂载：捕获后续初始化过程中的异常
   bindEvents();
   initDefault();
 }

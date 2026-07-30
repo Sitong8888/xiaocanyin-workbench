@@ -25,6 +25,45 @@
 const ZHIPU_CHAT_URL   = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const ZHIPU_SEARCH_URL = "https://open.bigmodel.cn/api/paas/v4/web_search";
 
+/* ---------- 边缘防护：速率限制 + KV 结果缓存 ----------
+ * KV 绑定名：BRAND_CACHE（见 wrangler.toml）。未绑定时全部优雅降级：
+ *   · 限流直接放行（不阻断业务）
+ *   · 缓存读写跳过（每次走实时管线）
+ * 可调环境变量：RATE_LIMIT_PER_MIN（默认 30 次/IP/分钟）、CACHE_TTL（默认 21600s=6h） */
+const RL_DEFAULT_PER_MIN = 30;
+const CACHE_TTL_HIT   = 21600;   // 有真实榜单 → 缓存 6h（付费 API 不再重复烧）
+const CACHE_TTL_EMPTY = 600;     // 空结果 → 只缓存 10min（防反复空烧，但不长期锁死）
+
+export function cacheKeyOf(searchQuery) {
+  return "brands:v1:" + String(searchQuery || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/* 固定窗口限流（KV 计数，非严格原子——对「防刷付费 API」这个目标足够） */
+async function rateLimitOk(env, ip, limit) {
+  const kv = env.BRAND_CACHE;
+  if (!kv) return true;
+  const bucket = Math.floor(Date.now() / 60000);
+  const key = `rl:v1:${ip}:${bucket}`;
+  let cur = 0;
+  try { cur = Number(await kv.get(key)) || 0; } catch { return true; }   // KV 读失败不阻断业务
+  if (cur >= limit) return false;
+  try { await kv.put(key, String(cur + 1), { expirationTtl: 120 }); } catch { /* 写失败忽略 */ }
+  return true;
+}
+
+async function readCache(env, key) {
+  if (!env.BRAND_CACHE) return null;
+  try {
+    const hit = await env.BRAND_CACHE.get(key, "json");
+    return (hit && Array.isArray(hit.brands)) ? hit : null;
+  } catch { return null; }
+}
+
+async function writeCache(env, key, payload, ttl) {
+  if (!env.BRAND_CACHE) return;
+  try { await env.BRAND_CACHE.put(key, JSON.stringify(payload), { expirationTtl: ttl }); } catch { /* 缓存写失败不影响返回 */ }
+}
+
 /* ---------- Step 1a：解析前端 query → 净化检索词（搜推分离） ---------- */
 /* 兼容两种前端格式：
  *   新："海口市 龙华区 鲜果茶 美团 大众点评 热门 分类:餐饮>茶饮咖啡>新式茶饮>鲜果茶"
@@ -195,12 +234,52 @@ export default {
     });
 
     try {
+      const url = new URL(request.url);
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+
+      /* ---------- /log：前端错误上报（sendBeacon POST，wrangler tail 可查） ---------- */
+      if (url.pathname.endsWith("/log") && request.method === "POST") {
+        try {
+          const body = await request.text();
+          const entry = JSON.parse(body.slice(0, 4096));   // 截断，防超大 payload
+          console.error("[client-error]", JSON.stringify({
+            ip, ua: (request.headers.get("User-Agent") || "").slice(0, 120),
+            msg: String(entry.msg || "").slice(0, 500),
+            src: String(entry.src || "").slice(0, 200),
+            line: entry.line, col: entry.col,
+            stack: String(entry.stack || "").slice(0, 800),
+            page: String(entry.page || "").slice(0, 200),
+            t: entry.t,
+          }));
+        } catch { /* 上报体不合法 → 静默丢弃 */ }
+        return new Response(null, { headers: corsHeaders, status: 204 });
+      }
+
       const zhipuKey = env.ZHIPU_API_KEY;
       if (!zhipuKey) return json({ error: "ZHIPU_API_KEY Missing", brands: [] });
 
-      const url = new URL(request.url);
+      /* ---------- 速率限制：默认 30 次/IP/分钟（KV 未绑定时放行） ---------- */
+      const rlLimit = Number(env.RATE_LIMIT_PER_MIN) || RL_DEFAULT_PER_MIN;
+      if (!(await rateLimitOk(env, ip, rlLimit))) {
+        return new Response(JSON.stringify({ error: "Rate Limited", brands: [], _meta: { reason: "rate_limited" } }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+          status: 429,
+        });
+      }
+
       const rawQuery = url.searchParams.get("q") || "";
       const { region, l3, catPath, searchQuery } = buildSearchQuery(rawQuery);
+
+      /* ---------- KV 缓存：命中直接返回，不触碰博查/智谱付费 API ---------- */
+      const cacheKey = cacheKeyOf(searchQuery);
+      const noCache = url.searchParams.get("nocache") === "1";
+      if (!noCache) {
+        const cached = await readCache(env, cacheKey);
+        if (cached) {
+          cached._meta = { ...(cached._meta || {}), cache: "hit" };
+          return json(cached);
+        }
+      }
 
       /* ========== Step 1：获取网页快照 ========== */
       let snippets = null;
@@ -214,7 +293,9 @@ export default {
 
       if (!snippets || !snippets.length) {
         // 搜索层拿不到任何快照 → 明确返回空，前端展示行业基准分析模型
-        return json({ brands: [], _meta: { pipeline: "two-step", provider, snippetCount: 0, reason: "no_snippets", searchQuery } });
+        const emptyPayload = { brands: [], _meta: { pipeline: "two-step", provider, snippetCount: 0, reason: "no_snippets", searchQuery } };
+        await writeCache(env, cacheKey, emptyPayload, CACHE_TTL_EMPTY);   // 短缓存：防同一空查询反复烧搜索额度
+        return json(emptyPayload);
       }
       const snippetText = snippetsToText(snippets);
 
@@ -250,7 +331,7 @@ export default {
       /* ========== 双重清洗：假名正则 + 事实锚定校验 ========== */
       const g = groundFilter(resultData && resultData.brands, snippetText);
 
-      return json({
+      const payload = {
         brands: g.brands.slice(0, 8),
         _meta: {
           pipeline: "two-step",
@@ -263,7 +344,10 @@ export default {
           ungroundedDrop: g.ungroundedDrop,
           searchQuery,
         },
-      });
+      };
+      // 有真实榜单缓存 6h，空榜单短缓存 10min（错误结果不缓存）
+      await writeCache(env, cacheKey, payload, payload.brands.length ? CACHE_TTL_HIT : CACHE_TTL_EMPTY);
+      return json(payload);
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message, brands: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -149,18 +149,18 @@ function boot(responder) {
 ### 阶段一：守门（已部分完成）
 - [x] 建立 `npm run verify` 强制门禁
 - [x] CI 双 job 拦截
-- [ ] **每位成员本地 pre-commit hook 跑 `npm run verify`**（建议加 husky / simple-git-hooks）
+- [x] **每位成员本地 pre-commit hook 跑 `npm run verify`**（husky，clone 后 `npm install` 自动生效）
 - [ ] 每周Review会过一遍本周 PR 的"竞态/空catch/XSS"三类问题
 
 ### 阶段二：习惯内化
 - [ ] 新功能 TDD：先写失败的契约测试，再写实现
 - [ ] 每个 Bug 附带"回归测试 + 回退验证记录"
-- [ ] 重构 `app.js` 分层（P2 技术债），降到 400 行内
+- [x] 重构 `app.js` 分层（P2 技术债）：拆为 core/live/render/insight/interactions + 薄入口
 
 ### 阶段三：工程卓越
-- [ ] Worker 速率限制 + KV 缓存（防刷爆付费 API）
-- [ ] 前端错误上报（线上 `window.onerror` → 日志服务）
-- [ ] `innerHTML` 默认转义封装（统一 `safeHTML()` 入口，杜绝裸拼接）
+- [x] Worker 速率限制 + KV 缓存（`cloudflare/worker.js`：IP 固定窗口限流 + 检索词级缓存，KV 未绑定自动降级；开启方法见 `wrangler.toml` 注释；测试 `tests/worker-guard.test.js`）
+- [x] 前端错误上报（`js/core.js` → `initErrorReporting()`：error/unhandledrejection → 去重限量 → sendBeacon/fetch POST 到 Worker `/log`，`wrangler tail` 实时查看；测试 `tests/safe-html.test.js`）
+- [x] `innerHTML` 默认转义封装（`js/core.js` → `setHTML()/html\`\`/raw()`：普通字符串默认转义、可信 HTML 必须 raw() 显式标记；ESLint `no-restricted-syntax` 禁止直接赋值 innerHTML/outerHTML/insertAdjacentHTML）
 - [ ] 性能预算：首屏 < 1.5s，动画 60fps
 
 ---
