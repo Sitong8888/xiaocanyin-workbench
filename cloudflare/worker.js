@@ -2,8 +2,11 @@
  * 小餐饮工作台 · Cloudflare Worker 代理 v3
  * 架构：两步式搜索 + 强事实锚定（Grounding）提取
  *
- *  Step 1  精确检索词：
- *          "[城市][区县]" "[三级细分品类]" (美团 OR 大众点评 OR 抖音) (榜单 OR 热门 OR 团购)
+ *  Step 1  净化检索词（搜推分离）：
+ *          发给搜索引擎的关键词必须是干净自然语言：
+ *            [城市] [区县] [三级细分] 美团 大众点评 热门
+ *          彻底剔除 分类: 语法、>、双引号与省级前缀（否则博查等引擎 0 召回）；
+ *          分类路径仅作为背景上下文传给 Step 2 的智谱 GLM 做品类约束。
  *          → 若配置 SEARCH_API_KEY + SEARCH_PROVIDER（tavily | bocha | serpapi），
  *            优先用外部专业搜索 API 抓取百度/美团网页快照；
  *          → 未配置则用智谱 Web Search API 兜底获取快照。
@@ -22,23 +25,49 @@
 const ZHIPU_CHAT_URL   = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const ZHIPU_SEARCH_URL = "https://open.bigmodel.cn/api/paas/v4/web_search";
 
-/* ---------- Step 1a：解析前端 query → 强约束检索词 ---------- */
-/* 前端格式："广东省深圳市南山区" "螺蛳粉" … 分类:餐饮>小吃快餐>米面粉食>螺蛳粉 */
+/* ---------- Step 1a：解析前端 query → 净化检索词（搜推分离） ---------- */
+/* 兼容两种前端格式：
+ *   新："海口市 龙华区 鲜果茶 美团 大众点评 热门 分类:餐饮>茶饮咖啡>新式茶饮>鲜果茶"
+ *   旧：""海南省海口市龙华区" "鲜果茶" 美团 大众点评 抖音 热门商家 真实店名 分类:…"
+ * 输出给搜索引擎的 searchQuery 必须是干净自然语言：
+ *   海口市 龙华区 鲜果茶 美团 大众点评 热门
+ * （无 分类: 语法、无 >、无双引号、无省级前缀 —— 否则博查 0 召回）
+ * catPath 只作为背景上下文传给 Step 2 的智谱 GLM 做品类约束。 */
 export function buildSearchQuery(rawQuery) {
-  const raw = String(rawQuery || "");
-  const quoted = [];
-  const re = /"([^"]+)"/g;
-  let m;
-  while ((m = re.exec(raw)) !== null) quoted.push(m[1]);
-  const region  = quoted[0] || "";
-  const l3      = quoted[1] || "";
-  const catM    = raw.match(/分类:(\S+)/);
+  let raw = String(rawQuery || "").trim();
+
+  // 1) 提取并剥离分类路径（仅供提取步骤使用，绝不进搜索词）
+  const catM = raw.match(/分类[:：]\s*(\S+)/);
   const catPath = catM ? catM[1] : "";
-  const core = (region || l3) ? `"${region}" "${l3}"` : raw.replace(/分类:\S+/, "").trim();
-  return {
-    region, l3, catPath,
-    searchQuery: `${core} (美团 OR 大众点评 OR 抖音) (榜单 OR 热门 OR 团购)`.trim(),
-  };
+  raw = raw.replace(/分类[:：]\s*\S+/g, " ");
+
+  // 2) 剥离所有中英文引号（强制引号短语会让搜索引擎 0 召回）
+  raw = raw.replace(/["“”'‘’]/g, " ");
+
+  // 3) 去掉冗余修饰词与旧版布尔语法
+  raw = raw.replace(/真实店名|热门商家|品牌排行榜|排行榜|爆品|榜单|团购|[()（）]|OR/g, " ");
+  raw = raw.replace(/\s+/g, " ").trim();
+
+  // 4) 拆 token：分离区域词 / 品类词（平台词后面统一重拼，防重复）
+  const PLATFORM_RE = /^(美团|大众点评|点评|抖音|热门)$/;
+  const regionToks = [], otherToks = [];
+  for (const t of raw.split(" ").filter(Boolean)) {
+    if (PLATFORM_RE.test(t)) continue;
+    if (/[省市区县旗盟州]$/.test(t) || /(省|市|自治区).+?(市|区|县|旗)/.test(t)) regionToks.push(t);
+    else otherToks.push(t);
+  }
+
+  // 5) 区域净化：丢省级前缀 + 市/区之间补空格（"海南省海口市龙华区" → "海口市 龙华区"）
+  let region = regionToks.join("");
+  region = region.replace(/^(.{1,8}?(?:省|自治区))(?=.)/, "");
+  region = region.replace(/(市)(?=.)/, "$1 ");
+
+  // 6) 三级细分：优先取分类路径末段（规范名），否则取剩余品类词
+  const l3 = catPath ? (catPath.split(">").pop() || "") : otherToks.join(" ");
+  const coreCat = l3 || otherToks.join(" ");
+
+  const searchQuery = `${region} ${coreCat} 美团 大众点评 热门`.replace(/\s+/g, " ").trim();
+  return { region: region.replace(/\s+/g, ""), l3, catPath, searchQuery };
 }
 
 /* ---------- Step 1b：外部专业搜索 API（Tavily / 博查 / SerpAPI） ---------- */
@@ -141,7 +170,7 @@ export function buildExtractPrompt(region, l3, catPath) {
 2. 若检索文本中真实店铺不足，有几家提几家，其余字段填 null；一家都没有就返回 {"brands":[]}。
 3. 严禁使用任何带"XX"、"某某"、"ABC"、"品牌名"、"示例"等占位符的名称。
 4. 客单价（avgPrice）只能取快照中出现的真实人均消费数字；文本中没有则填 null，严禁编造，严禁为 0。
-5. 目标品类：${catPath || l3 || "本地生活"}。只提取属于「${l3 || "该三级细分品类"}」的商家；若品类是吃的（小吃快餐/火锅/地方菜/粉面等），绝对禁止提取星巴克、瑞幸、喜茶、蜜雪冰城等咖啡/茶饮品牌。
+5. 目标品类（背景约束）：${catPath || l3 || "本地生活"}。只提取属于「${l3 || "该三级细分品类"}」的商家，严禁把椰子鸡、烧烤、火锅等异业品牌提炼进来；若品类是吃的（小吃快餐/火锅/地方菜/粉面等），绝对禁止提取星巴克、瑞幸、喜茶、蜜雪冰城等咖啡/茶饮品牌。
 6. 目标区域：${region || "用户指定区域"}。本地真实商家优先于全国连锁。
 7. 若快照显示该商家上过抖音同城热销榜/热播榜/打卡榜，在 douyinRank 标明（如："🎵 抖音同城热销榜 Top2"）；否则为空字符串。
 

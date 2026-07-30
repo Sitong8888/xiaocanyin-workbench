@@ -148,23 +148,23 @@
   const APP_CONFIG = (window.APP_CONFIG && typeof window.APP_CONFIG === 'object') ? window.APP_CONFIG : {};
   const LIVE_TIMEOUT = APP_CONFIG.liveApiTimeout || 6000;
 
-  // 检索词构造器：对齐美团/大众点评/抖音分类标准，输出完整分类路径（负向过滤靠后端硬规则）
-  // 格式：[省/市/区] 分类:[行业大类]>[一级赛道]>[二级品类]>[三级细分] 品牌排行榜 爆品
-  // 示例：广东省 深圳市 南山区 分类:餐饮>小吃快餐>特色粉面>螺蛳粉 品牌排行榜 爆品
+  // 检索词构造器（搜推分离）：
+  //   · 搜索部分 = 干净自然语言（无引号/无分类语法/剔除省级前缀），保证博查等搜索引擎正常召回
+  //   · 分类路径 = 仅以 分类:xxx 形式附带，供 Worker 提取步骤（智谱 GLM）做品类约束，不进搜索词
+  // 示例：海口市 龙华区 鲜果茶 美团 大众点评 热门 分类:餐饮>茶饮咖啡>新式茶饮>鲜果茶
   function buildLiveQuery() {
     const r = state.region;
     if (!r.prov) return null;
     const l3Id = primaryL3();
     if (!l3Id) return null;
-    const region = [r.prov.name, r.city ? r.city.name : '', r.dist || ''].filter(Boolean).join('');
+    // 有市则丢弃省（博查用「海口市 龙华区」比「海南省海口市龙华区」召回好得多）
+    const regionParts = [r.city ? r.city.name : r.prov.name, r.dist || ''].filter(Boolean);
     const cat = CATEGORIES.find(c => c.id === state.category);
     const path = getPath(state.category, l3Id);           // [L1, L2, L3]
     const catPath = [cat ? cat.name : '', path[0] ? path[0].name : '', path[1] ? path[1].name : '', path[2] ? path[2].name : '']
       .filter(Boolean).join('>');
     const l3Name = path[2] ? path[2].name : (path[1] ? path[1].name : '');
-    // 强制平台后缀 + 引号锁定核心词，示例：
-    // "海口市" "足道采耳" 美团 大众点评 抖音 热门商家 真实店名 分类:服务>...>足道采耳
-    return `"${region}" "${l3Name}" 美团 大众点评 抖音 热门商家 真实店名 分类:${catPath}`;
+    return `${regionParts.join(' ')} ${l3Name} 美团 大众点评 热门 分类:${catPath}`;
   }
 
   // 前端兜底：拦截后端漏网的占位符/假数据
