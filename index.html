@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>小餐饮爆品与赛道筛选工作台</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部标题 -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo">🍜</span>
+        <div>
+          <h1>小餐饮爆品与赛道筛选</h1>
+          <p>多级关联 · 赛道对比 · 爆品下钻</p>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="tag tag-blue">蓝海</span>
+        <span class="tag tag-potential">高潜</span>
+        <span class="tag tag-red">红海</span>
+        <span class="tag tag-stable">平稳</span>
+      </div>
+    </header>
+
+    <!-- 第一步：级联筛选 -->
+    <section class="filter-block">
+      <div class="section-title"><i>①</i> 选择分析对象（行业 1→2→3 级联动）</div>
+
+      <div class="cascader-card" data-group="A">
+        <div class="cascader-head">
+          <span class="grp-dot dot-a"></span>
+          <span class="grp-label">主分析对象</span>
+          <button class="btn-pick" data-group="A">选择行业 ▾</button>
+        </div>
+        <div class="cascader-path" data-path="A">未选择</div>
+        <div class="cascader-panel" data-panel="A" hidden></div>
+      </div>
+
+      <div class="cascader-card" data-group="B">
+        <div class="cascader-head">
+          <span class="grp-dot dot-b"></span>
+          <span class="grp-label">对比分析对象</span>
+          <button class="btn-pick" data-group="B">选择行业 ▾</button>
+        </div>
+        <div class="cascader-path" data-path="B">未选择</div>
+        <div class="cascader-panel" data-panel="B" hidden></div>
+      </div>
+    </section>
+
+    <!-- 第四步：战略空位分析面板（顾均辉空位表模型） -->
+    <section class="strategy" id="strategyPanel" hidden>
+      <div class="section-title"><i>④</i> 🎯 战略空位分析面板
+        <span class="sub-title">（顾均辉空位表模型）</span>
+      </div>
+
+      <div class="strat-tabs" id="stratTabs"></div>
+
+      <!-- 单赛道 4 板块 -->
+      <div class="strat-single" id="stratSingle"></div>
+
+      <!-- 双赛道空位对比 -->
+      <div class="strat-compare" id="stratCompare" hidden></div>
+    </section>
+
+    <!-- 第二步：全景看板 -->
+    <section class="dashboard" id="dashboard" hidden>
+      <!-- KPI 横滑卡片 -->
+      <div class="section-title"><i>②</i> 核心指标卡（左右横滑查看更多）</div>
+      <div class="swiper" id="kpiSwiper"></div>
+
+      <!-- 雷达 + 矩阵 -->
+      <div class="grid-2">
+        <div class="widget">
+          <div class="widget-title">维度雷达对比</div>
+          <div class="chart-wrap"><svg id="radarChart" viewBox="0 0 320 300" preserveAspectRatio="xMidYMid meet"></svg></div>
+          <div class="chart-legend">
+            <span class="lg lg-a">● 主分析对象</span>
+            <span class="lg lg-b">● 对比分析对象</span>
+          </div>
+        </div>
+        <div class="widget">
+          <div class="widget-title">双向交叉矩阵</div>
+          <div class="matrix" id="matrixBox"></div>
+        </div>
+      </div>
+
+      <!-- 趋势折线 -->
+      <div class="section-title"><i>③</i> 近 12 个月趋势对比</div>
+      <div class="widget">
+        <div class="chart-wrap wide"><svg id="lineChart" viewBox="0 0 640 280" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="chart-legend">
+          <span class="lg lg-a">● 主分析对象</span>
+          <span class="lg lg-b">● 对比分析对象</span>
+        </div>
+      </div>
+
+      <button class="btn-drill" id="drillBtn">🔍 下钻：品牌与商品全景图</button>
+    </section>
+
+    <!-- 空态 -->
+    <section class="empty" id="emptyState">
+      <div class="empty-ill">📊</div>
+      <p>请为「主分析对象」与「对比分析对象」各选择一个<strong>三级行业</strong>，<br/>即可生成赛道对比全景看板。</p>
+    </section>
+  </div>
+
+  <!-- 第三步：下钻抽屉（品牌与商品全景） -->
+  <div class="drawer-mask" id="drawerMask" hidden></div>
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-head">
+      <span id="drawerTitle">品牌与商品全景</span>
+      <button class="btn-close" id="drawerClose">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
