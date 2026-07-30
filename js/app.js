@@ -141,12 +141,143 @@
 
   function closeRegionPanel() { $('#regionPanel').classList.remove('open'); $('#regionPick').textContent = '选择区域 ▾'; }
 
-  /* ---------------- 区域动态洞察（联网实时查询模拟） ---------------- */
-  // 模拟异步实时抓取：带 loading + 确定性结果（无后端前端实时生成）
-  function fetchRegionInsight(catId, l3Id, region) {
-    return new Promise(resolve => {
-      setTimeout(() => resolve(genRegionInsight(catId, l3Id, region)), 420);
-    });
+  /* ---------------- 区域动态洞察（联网实时查询） ---------------- */
+  // 契约：若 window.APP_CONFIG.liveApiBase 已配置，则向该后端代理发起实时检索，
+  //       代理返回 {"brands":[{brandName,hotItem,avgPrice,rating,tag}]}；
+  //       前端负责 Loading 态与失败降级（无后端 / 超时 / 解析失败 → 用 data.js 基准数据）。
+  const APP_CONFIG = (window.APP_CONFIG && typeof window.APP_CONFIG === 'object') ? window.APP_CONFIG : {};
+  const LIVE_TIMEOUT = APP_CONFIG.liveApiTimeout || 6000;
+
+  function buildLiveQuery() {
+    const r = state.region;
+    if (!r.prov) return null;
+    const l3Id = primaryL3();
+    if (!l3Id) return null;
+    const l3Name = getNode(state.category, l3Id).name;
+    const parts = [r.prov.name];
+    if (r.city) parts.push(r.city.name);
+    if (r.dist) parts.push(r.dist);
+    parts.push(l3Name, '美团', '大众点评', '热门品牌', '招牌爆品', '排行榜');
+    return parts.join(' ');
+  }
+
+  // 防 XSS：联网返回的数据不可信，渲染前先转义
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function normLiveBrand(b) {
+    b = b || {};
+    let tag = String(b.tag || '').trim();
+    if (!['红海', '蓝海', '高潜', '平稳'].includes(tag)) tag = '平稳';
+    let rating = parseFloat(b.rating); if (isNaN(rating)) rating = 0;
+    let avgPrice = parseFloat(b.avgPrice); if (isNaN(avgPrice)) avgPrice = 0;
+    return {
+      brandName: b.brandName || b.name || '未知品牌',
+      hotItem: b.hotItem || b.signboard || '',
+      avgPrice: avgPrice,
+      rating: rating,
+      tag: tag,
+    };
+  }
+  function tagClass(tag) {
+    return ({ '红海': 'o-red', '蓝海': 'o-blue', '高潜': 'o-high', '平稳': 'o-stable' }[tag]) || 'o-stable';
+  }
+
+  // 实时检索：调用后端代理（后端再联网美团/大众点评/搜索引擎 + LLM 解析为结构化数据）
+  async function fetchLiveBrands(query) {
+    const base = APP_CONFIG.liveApiBase;
+    if (!base) return null;                 // 未配置后端 → 触发降级
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), LIVE_TIMEOUT);
+    try {
+      const sep = base.indexOf('?') >= 0 ? '&' : '?';
+      const url = base + sep + 'q=' + encodeURIComponent(query);
+      const headers = APP_CONFIG.liveApiKey ? { 'x-api-key': String(APP_CONFIG.liveApiKey) } : {};
+      const res = await fetch(url, { signal: ctrl.signal, headers });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : (data.brands || data.data || data.results || []);
+      if (!Array.isArray(arr) || !arr.length) return null;
+      return arr.map(normLiveBrand).slice(0, 8);
+    } catch (e) {
+      return null;                          // 网络 / 解析失败 → 触发降级
+    } finally {
+      clearTimeout(tid);
+    }
+  }
+
+  function renderMockBrands(ins) {
+    return ins.localBrands.map(b => `
+      <div class="rb-item">
+        <span class="rb-name">${esc(b.name)}${b.local ? '<i class="rb-local">本地新锐</i>' : '<i class="rb-nat">全国连锁</i>'}</span>
+        <span class="rb-share">市占 ${b.share}%</span>
+        <div class="rb-bar"><span style="width:${Math.min(100, b.share * 3)}%"></span></div>
+      </div>`).join('');
+  }
+  function renderMockProducts(ins) {
+    return ins.products.map(p => `
+      <div class="rp-card">
+        <div class="rp-top"><span class="rp-name">${esc(p.name)}</span><span class="rp-tag">${esc(p.tag)}</span></div>
+        <div class="rp-meta"><span>¥${p.price}</span><span class="rp-heat">热度 ${p.heat}</span></div>
+      </div>`).join('');
+  }
+  function renderLiveBrands(live) {
+    return live.map(b => `
+      <div class="rb-item live">
+        <div class="rb-top">
+          <span class="rb-name">${esc(b.brandName)} <i class="rb-tag ${tagClass(b.tag)}">${esc(b.tag)}</i></span>
+          <span class="rb-rating">★ ${b.rating}</span>
+        </div>
+        <div class="rb-meta">招牌爆品：${esc(b.hotItem) || '—'} ｜ 人均 ¥${b.avgPrice}</div>
+      </div>`).join('');
+  }
+
+  function regionInsightShell(ins, opts) {
+    opts = opts || {};
+    const label = regionLabel() || '全国';
+    let brandsInner, srcLabel;
+    if (opts.loading) {
+      brandsInner = `<div class="ri-loading"><span class="spinner"></span> 正在实时抓取「${esc(label)}」美团 / 大众点评数据…</div>`;
+      srcLabel = '<span class="ri-src loading">● 实时抓取中</span>';
+    } else if (opts.live) {
+      brandsInner = opts.live.length
+        ? renderLiveBrands(opts.live)
+        : (renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`);
+      srcLabel = '<span class="ri-src live">● 实时美团/点评</span>';
+    } else if (opts.fallback) {
+      brandsInner = `<div class="ri-fallback">⚠ 实时获取失败，已展示基准数据</div>` +
+        renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
+      srcLabel = '<span class="ri-src mock">○ 基准数据</span>';
+    } else {
+      brandsInner = renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
+      srcLabel = '<span class="ri-src mock">○ 基准数据</span>';
+    }
+    return `
+      <div class="ri-head">
+        <span class="ri-title">🌐 ${esc(ins.regionName)} · ${esc(getNode(state.category, primaryL3()).name)} · 区域动态洞察</span>
+        <span class="ri-query">检索词：<code>${esc(ins.query)}</code></span>
+      </div>
+      <div class="ri-chips">
+        <span class="ri-chip heat">市场热度 <b>${ins.heat}</b>/100</span>
+        <span class="ri-chip comp">竞争指数 <b>${(ins.competition * 100).toFixed(0)}</b>/100</span>
+        <span class="ri-chip ${OCEAN_CLASS[ins.ocean]}">${OCEAN_TEXT[ins.ocean]}</span>
+        <span class="ri-chip mod">区域系数 ×${ins.sizeMod}</span>
+      </div>
+      <div class="ri-body">
+        <div class="ri-col">
+          <div class="ri-sub">🏆 该区域 TOP 品牌 / 爆品 ${srcLabel}</div>
+          <div id="riBrands">${brandsInner}</div>
+        </div>
+        <div class="ri-col">
+          <div class="ri-sub">🎯 本地化战略空位（顾均辉空位表）</div>
+          <div class="ri-cell"><div class="ri-t">😣 本地人群痛点</div><div class="ri-b">${esc(ins.localPain)}</div></div>
+          <div class="ri-cell"><div class="ri-t">⚠️ 竞品本地弱点</div><div class="ri-b">${esc(ins.localWeak)}</div></div>
+          <div class="ri-gap">🎯 本地化切入点（核心结论）<div class="sg-text">${esc(ins.localGap)} <span class="gap-tag ${'gt-' + GAP_TYPES.indexOf(ins.gapType)}">${GAP_ICON[ins.gapType] || ''} ${esc(ins.gapType)}</span></div></div>
+        </div>
+      </div>`;
   }
 
   function refreshRegionInsight() {
@@ -161,59 +292,31 @@
     }
     if (!l3Id) {
       box.className = 'region-insight';
-      box.innerHTML = `<div class="ri-ph">📍 已选区域 <b>${label}</b> — 请选择一个三级行业，立即触发该区域的实时市场洞察。</div>`;
+      box.innerHTML = `<div class="ri-ph">📍 已选区域 <b>${esc(label)}</b> — 请选择一个三级行业，立即触发该区域的实时市场洞察。</div>`;
       return;
     }
-    const l3Name = getNode(state.category, l3Id).name;
-    box.className = 'region-insight loading';
-    box.innerHTML = `<div class="ri-loading"><span class="spinner"></span> 正在联网实时检索「${label} × ${l3Name}」市场数据（热度 / 竞品 / 爆品 / 战略空位）…</div>`;
-    fetchRegionInsight(state.category, l3Id, state.region).then(ins => {
-      // 防止竞态：若用户已切换区域/行业，丢弃过期结果
-      const stillSame = state.region.prov === prov && primaryL3() === l3Id;
-      if (!stillSame || !ins) return;
-      renderRegionInsight(ins);
-    });
-  }
-
-  function renderRegionInsight(ins) {
-    const box = $('#regionInsight');
-    box.className = 'region-insight';
-    const brands = ins.localBrands.map(b => `
-      <div class="rb-item">
-        <span class="rb-name">${b.name}${b.local ? '<i class="rb-local">本地新锐</i>' : '<i class="rb-nat">全国连锁</i>'}</span>
-        <span class="rb-share">市占 ${b.share}%</span>
-        <div class="rb-bar"><span style="width:${Math.min(100, b.share * 3)}%"></span></div>
-      </div>`).join('');
-    const products = ins.products.map(p => `
-      <div class="rp-card">
-        <div class="rp-top"><span class="rp-name">${p.name}</span><span class="rp-tag">${p.tag}</span></div>
-        <div class="rp-meta"><span>¥${p.price}</span><span class="rp-heat">热度 ${p.heat}</span></div>
-      </div>`).join('');
-    box.innerHTML = `
-      <div class="ri-head">
-        <span class="ri-title">🌐 ${ins.regionName} · ${getNode(state.category, primaryL3()).name} · 区域动态洞察</span>
-        <span class="ri-query">检索词：<code>${ins.query}</code></span>
-      </div>
-      <div class="ri-chips">
-        <span class="ri-chip heat">市场热度 <b>${ins.heat}</b>/100</span>
-        <span class="ri-chip comp">竞争指数 <b>${(ins.competition * 100).toFixed(0)}</b>/100</span>
-        <span class="ri-chip ${OCEAN_CLASS[ins.ocean]}">${OCEAN_TEXT[ins.ocean]}</span>
-        <span class="ri-chip mod">区域系数 ×${ins.sizeMod}</span>
-      </div>
-      <div class="ri-body">
-        <div class="ri-col">
-          <div class="ri-sub">🏆 该区域 TOP 品牌 / 爆品</div>
-          ${brands}
-          <div class="ri-sub">🔥 区域爆品卡</div>
-          <div class="rp-grid">${products}</div>
-        </div>
-        <div class="ri-col">
-          <div class="ri-sub">🎯 本地化战略空位（顾均辉空位表）</div>
-          <div class="ri-cell"><div class="ri-t">😣 本地人群痛点</div><div class="ri-b">${ins.localPain}</div></div>
-          <div class="ri-cell"><div class="ri-t">⚠️ 竞品本地弱点</div><div class="ri-b">${ins.localWeak}</div></div>
-          <div class="ri-gap">🎯 本地化切入点（核心结论）<div class="sg-text">${ins.localGap} <span class="gap-tag ${'gt-' + GAP_TYPES.indexOf(ins.gapType)}">${GAP_ICON[ins.gapType] || ''} ${ins.gapType}</span></div></div>
-        </div>
-      </div>`;
+    const ins = genRegionInsight(state.category, l3Id, state.region);
+    const query = buildLiveQuery();
+    const useLive = !!APP_CONFIG.liveApiBase && !!query;
+    if (useLive) {
+      // Loading 态：先渲染骨架，再异步拉取实时数据
+      box.className = 'region-insight loading';
+      box.innerHTML = regionInsightShell(ins, { loading: true, query });
+      const token = { prov: prov, l3: l3Id };
+      fetchLiveBrands(query).then(live => {
+        // 防止竞态：若用户已切换区域/行业，丢弃过期结果
+        if (state.region.prov !== token.prov || primaryL3() !== token.l3) return;
+        box.innerHTML = regionInsightShell(ins, live ? { live } : { fallback: true });
+        box.classList.remove('loading');
+      }).catch(() => {
+        if (state.region.prov !== token.prov || primaryL3() !== token.l3) return;
+        box.innerHTML = regionInsightShell(ins, { fallback: true });
+        box.classList.remove('loading');
+      });
+    } else {
+      box.className = 'region-insight';
+      box.innerHTML = regionInsightShell(ins, {});
+    }
   }
 
   /* ---------------- 渲染：行业级联（A / B） ---------------- */

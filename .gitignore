@@ -15,3 +15,8 @@ qrcode.png
 .DS_Store
 Thumbs.db
 .git/refs/original/
+
+# Python 代理构建产物 / 密钥
+__pycache__/
+*.pyc
+.env
