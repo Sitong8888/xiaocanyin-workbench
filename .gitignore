@@ -2,11 +2,16 @@
 .workbuddy/
 .workbuddy/**
 
+# Node 依赖与工具缓存（package-lock.json 需入库以保证 CI 可复现）
+node_modules/
+.eslintcache
+
 # 临时文件
 _*.js
 *.tmp
 *.log
 ip.txt
+test_*_tmp.*
 
 # 局域网二维码（非站点资源）
 qrcode.png

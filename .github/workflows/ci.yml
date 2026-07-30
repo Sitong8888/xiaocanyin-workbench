@@ -1,0 +1,62 @@
+name: CI
+
+# 质量门禁：任何进入 main 的改动都必须通过语法检查、Lint 与全量测试。
+# 站点是纯静态部署（GitHub Pages），CI 不产出构建物，只负责「拦住坏代码」。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: 质量门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      - name: 语法检查
+        run: npm run check
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: 单元 / 集成测试
+        run: npm test
+
+  secret-scan:
+    name: 密钥泄漏扫描
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 前端代码会被完整公开在 GitHub Pages 上，任何密钥入库都等于当场泄漏。
+      # 这里用零依赖的正则扫描覆盖本项目实际用到的几类 Key。
+      - name: 扫描明文密钥
+        run: |
+          set -e
+          PATTERN='sk-[A-Za-z0-9]{24,}|cfat_[A-Za-z0-9]{24,}|ghp_[A-Za-z0-9]{30,}|[0-9a-f]{32}\.[A-Za-z0-9]{16}|AKIA[0-9A-Z]{16}'
+          if grep -rInE "$PATTERN" \
+              --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.github . ; then
+            echo "::error::检测到疑似明文密钥，禁止合并。密钥必须存放于 Cloudflare Secret / 环境变量。"
+            exit 1
+          fi
+          echo "未发现明文密钥。"

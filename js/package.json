@@ -1,0 +1,4 @@
+{
+  "//": "作用域声明：根 package.json 为 type=module（worker/vercel 均为 ESM），但 js/ 下的前端脚本是 <script> 直接加载的经典脚本，data.js 依赖 CommonJS 的 module.exports 守卫对外暴露以便 node 直接调试。此文件把 js/ 目录锁回 commonjs，避免根配置的溢出影响。浏览器与 GitHub Pages 会忽略本文件。",
+  "type": "commonjs"
+}

@@ -42,8 +42,8 @@ export default async function handler(req, res) {
     const data = await queryDeepSeek(process.env.DEEPSEEK_API_KEY, q, ctx);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', ...CORS });
     res.end(JSON.stringify(data));
-  } catch (e) {
-    const msg = e && e.message ? e.message : String(e);
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
     res.writeHead(502, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify({ error: msg, brands: [], degraded: true }));
   }
@@ -102,7 +102,7 @@ async function queryDeepSeek(key, q, searchContext) {
   let parsed;
   try {
     parsed = JSON.parse(content);
-  } catch (e) {
+  } catch {
     throw new Error('DeepSeek 返回非 JSON');
   }
 

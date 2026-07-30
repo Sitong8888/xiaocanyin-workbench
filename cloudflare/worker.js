@@ -104,7 +104,7 @@ async function searchExternal(provider, apiKey, q) {
       const arr = j.organic_results || [];
       return arr.map(r => ({ title: r.title || "", content: r.snippet || "", url: r.link || "" }));
     }
-  } catch (e) { /* 外部搜索失败 → 走智谱兜底 */ }
+  } catch { /* 外部搜索失败 → 走智谱兜底 */ }
   return null;
 }
 
@@ -121,7 +121,7 @@ async function searchZhipu(zhipuKey, q) {
     const arr = j.search_result || [];
     if (!Array.isArray(arr) || !arr.length) return null;
     return arr.map(r => ({ title: r.title || "", content: r.content || "", url: r.link || "" }));
-  } catch (e) { return null; }
+  } catch { return null; }
 }
 
 /* ---------- 快照 → 文本上下文 ---------- */
@@ -245,7 +245,7 @@ export default {
 
       let resultData;
       try { resultData = JSON.parse(jsonMatch[0]); }
-      catch (e) { return json({ error: "JSON Parse Failed", raw: rawContent, brands: [] }); }
+      catch { return json({ error: "JSON Parse Failed", raw: rawContent, brands: [] }); }
 
       /* ========== 双重清洗：假名正则 + 事实锚定校验 ========== */
       const g = groundFilter(resultData && resultData.brands, snippetText);

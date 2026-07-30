@@ -205,11 +205,28 @@
     return ({ '红海': 'o-red', '蓝海': 'o-blue', '高潜': 'o-high', '平稳': 'o-stable' }[tag]) || 'o-stable';
   }
 
+  /* 视图指纹：区域(省/市/区) + 三级行业 + 行业大类 的完整标识。
+   * 用于异步竞态守卫——任一维度变化都必须判定为「视图已切换」。
+   * ⚠️ 历史 Bug：旧实现只比对 prov 对象引用与 l3Id，切换市/区县时二者均不变，
+   *    守卫失效 → 旧区域的响应会覆盖新区域的结果（见 tests/race-guard.test.js）。 */
+  function liveViewKey() {
+    const r = state.region;
+    return [
+      state.category,
+      r.prov ? r.prov.id : '-',
+      r.city ? r.city.id : '-',
+      r.dist || '-',
+      primaryL3() || '-',
+    ].join('|');
+  }
+
+  let liveAbort = null;   // 在途请求控制器：新请求发起前主动取消旧请求，避免浪费付费额度
+
   // 实时检索：调用后端代理（后端再联网美团/大众点评/搜索引擎 + LLM 解析为结构化数据）
-  async function fetchLiveBrands(query) {
+  async function fetchLiveBrands(query, externalCtrl) {
     const base = APP_CONFIG.liveApiBase;
     if (!base) return null;                 // 未配置后端 → 触发降级
-    const ctrl = new AbortController();
+    const ctrl = externalCtrl || new AbortController();
     const tid = setTimeout(() => ctrl.abort(), LIVE_TIMEOUT);
     try {
       const sep = base.indexOf('?') >= 0 ? '&' : '?';
@@ -223,7 +240,7 @@
       const clean = arr.filter(b => !isFakeBrand(b)).map(normLiveBrand).slice(0, 8);
       if (!clean.length) return null;         // 全是假数据 → 触发降级，不展示脏数据
       return clean;
-    } catch (e) {
+    } catch {
       return null;                          // 网络 / 解析失败 → 触发降级
     } finally {
       clearTimeout(tid);
@@ -334,17 +351,21 @@
       // Loading 态：先渲染骨架，再异步拉取实时数据
       box.className = 'region-insight loading';
       box.innerHTML = regionInsightShell(ins, { loading: true, query });
-      const token = { prov: prov, l3: l3Id };
-      fetchLiveBrands(query).then(live => {
-        // 防止竞态：若用户已切换区域/行业，丢弃过期结果
-        if (state.region.prov !== token.prov || primaryL3() !== token.l3) return;
-        box.innerHTML = regionInsightShell(ins, live ? { live } : { fallback: true });
+      // 竞态守卫：以「行业大类+省+市+区+三级行业」完整指纹为准（任一维度变化即视为已切换）
+      const token = liveViewKey();
+      // 取消上一次仍在途的请求：既防止过期响应，也避免博查/智谱的付费额度被空烧
+      if (liveAbort) liveAbort.abort();
+      const ctrl = new AbortController();
+      liveAbort = ctrl;
+      const settle = payload => {
+        if (liveViewKey() !== token) return;   // 视图已切换 → 丢弃过期结果
+        if (liveAbort === ctrl) liveAbort = null;
+        box.innerHTML = regionInsightShell(ins, payload);
         box.classList.remove('loading');
-      }).catch(() => {
-        if (state.region.prov !== token.prov || primaryL3() !== token.l3) return;
-        box.innerHTML = regionInsightShell(ins, { fallback: true });
-        box.classList.remove('loading');
-      });
+      };
+      fetchLiveBrands(query, ctrl)
+        .then(live => settle(live ? { live } : { fallback: true }))
+        .catch(() => settle({ fallback: true }));
     } else {
       box.className = 'region-insight';
       box.innerHTML = regionInsightShell(ins, {});
@@ -417,8 +438,8 @@
       } else {
         empty.hidden = false; dash.hidden = true;
       }
-    } catch (e) {
-      console.error('render error', e);
+    } catch (err) {
+      console.error('render error', err);
     }
     renderStrategy(a, b);
   }
