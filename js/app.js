@@ -1,10 +1,11 @@
 /* =========================================================================
  * 爆品与赛道筛选 · 交互逻辑 (app.js)
- *  - 行业大类 Tab 切换（切换即重置 A/B 到该大类）
- *  - 区域级联选择器（省 → 市 → 区/县），数据按区域系数定制
+ *  - 行业大类下拉选择（切换即重置 A/B 到该大类）
+ *  - 区域级联选择器（全国 省 → 市 → 区/县），数据按区域系数定制
+ *  - 【核心】区域动态洞察：切换区域/三级行业时触发联网实时查询（模拟异步）
+ *    实时刷新 区域市场热度 / 竞争指数 / 本地 TOP 品牌 / 爆品 / 本地化战略空位
  *  - 主/对比分析对象三级联动、KPI 横滑、雷达/矩阵/趋势对比
- *  - 顾均辉战略空位面板 + 双赛道空位对比
- *  - 下钻抽屉（品牌/爆品 + 区域标签）
+ *  - 顾均辉战略空位面板 + 双赛道空位对比 + 下钻抽屉
  * ========================================================================= */
 (function () {
   'use strict';
@@ -14,7 +15,7 @@
 
   const state = {
     category: 'catering',
-    region: { prov: null, city: null, dist: null },
+    region: { prov: null, city: null, dist: null },   // prov/city: {id,name}; dist: string
     A: { sel: { L1: null, L2: null, L3: null } },
     B: { sel: { L1: null, L2: null, L3: null } },
   };
@@ -25,39 +26,42 @@
   const oceanClass = o => OCEAN_CLASS[o] || 'o-stable';
 
   function getSel(catId, sel) { return sel.L3 ? getAnalytics(catId, sel.L3) : null; }
+  function primaryL3() { return state.A.sel.L3 || state.B.sel.L3; }
 
-  /* ---------------- 渲染：行业大类 Tab ---------------- */
-  function renderCategoryTabs() {
-    const wrap = $('#catTabs');
-    wrap.innerHTML = '';
+  /* ---------------- 渲染：行业大类下拉 ---------------- */
+  function renderCategorySelect() {
+    const sel = $('#catSelect');
+    sel.innerHTML = '';
     CATEGORIES.forEach(c => {
-      const b = document.createElement('button');
-      b.className = 'cat-tab' + (c.id === state.category ? ' active' : '');
-      b.innerHTML = `<span class="cat-ic">${c.icon}</span>${c.name}`;
-      b.onclick = () => {
-        if (state.category === c.id) return;
-        state.category = c.id;
-        // 切换到该大类第一个/第二个三级行业，保证联动有效
-        const l3s = Object.values(TREES[c.id].L3);
-        const setTo = (grp, idx) => {
-          const node = l3s[idx] || l3s[0];
-          if (!node) return;
-          const path = getPath(c.id, node.id);
-          grp.sel.L1 = path[0] ? path[0].id : null;
-          grp.sel.L2 = path[1] ? path[1].id : null;
-          grp.sel.L3 = node.id;
-        };
-        setTo(state.A, 0);
-        setTo(state.B, Math.min(1, l3s.length - 1));
-        renderCategoryTabs();
-        $$('.cascader-panel').forEach(p => { p.classList.remove('open'); });
-        $$('.btn-pick').forEach(btn => { if (btn.dataset.group) btn.textContent = '选择行业 ▾'; });
-        ['A', 'B'].forEach(g => { renderCascader(g); updatePath(g); });
-        renderRegionEff();
-        maybeRender();
-      };
-      wrap.appendChild(b);
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.icon}  ${c.name}`;
+      sel.appendChild(opt);
     });
+    sel.value = state.category;
+    sel.onchange = () => setCategory(sel.value);
+  }
+
+  function setCategory(catId) {
+    if (!catId || state.category === catId) return;
+    state.category = catId;
+    const l3s = Object.values(TREES[catId].L3);
+    const setTo = (grp, idx) => {
+      const node = l3s[idx] || l3s[0];
+      if (!node) return;
+      const path = getPath(catId, node.id);
+      grp.sel.L1 = path[0] ? path[0].id : null;
+      grp.sel.L2 = path[1] ? path[1].id : null;
+      grp.sel.L3 = node.id;
+    };
+    setTo(state.A, 0);
+    setTo(state.B, Math.min(1, l3s.length - 1));
+    $$('.cascader-panel').forEach(p => p.classList.remove('open'));
+    $$('.btn-pick').forEach(btn => { if (btn.dataset.group) btn.textContent = '选择行业 ▾'; });
+    ['A', 'B'].forEach(g => { renderCascader(g); updatePath(g); });
+    renderRegionEff();
+    maybeRender();
+    refreshRegionInsight();
   }
 
   /* ---------------- 渲染：区域级联 ---------------- */
@@ -76,27 +80,25 @@
       });
       return col;
     };
-    const provs = Object.keys(REGIONS).map(id => ({ id, name: REGIONS[id].name }));
-    panel.appendChild(mk(provs, it => {
-      state.region = { prov: it.id, city: null, dist: null };
-      renderRegionPanel(); renderRegionEff(); maybeRender();
-    }, state.region.prov));
+    // 省级
+    panel.appendChild(mk(getProvinces(), it => {
+      state.region = { prov: { id: it.id, name: it.name }, city: null, dist: null };
+      renderRegionPanel(); renderRegionEff(); maybeRender(); refreshRegionInsight();
+    }, state.region.prov ? state.region.prov.id : null));
 
+    // 市级
     if (state.region.prov) {
-      const cities = Object.keys(REGIONS[state.region.prov].cities)
-        .map(id => ({ id, name: REGIONS[state.region.prov].cities[id].name }));
-      panel.appendChild(mk(cities, it => {
-        state.region.city = it.id; state.region.dist = null;
-        renderRegionPanel(); renderRegionEff(); maybeRender();
-      }, state.region.city));
+      panel.appendChild(mk(getCities(state.region.prov.id), it => {
+        state.region.city = { id: it.id, name: it.name }; state.region.dist = null;
+        renderRegionPanel(); renderRegionEff(); maybeRender(); refreshRegionInsight();
+      }, state.region.city ? state.region.city.id : null));
     }
+    // 区/县级
     if (state.region.prov && state.region.city) {
-      const dists = Object.keys(REGIONS[state.region.prov].cities[state.region.city].districts)
-        .map(id => ({ id, name: REGIONS[state.region.prov].cities[state.region.city].districts[id] }));
-      panel.appendChild(mk(dists, it => {
-        state.region.dist = it.id;
-        renderRegionPanel(); renderRegionEff(); maybeRender(); closeRegionPanel();
-      }, state.region.dist));
+      panel.appendChild(mk(getDistricts(state.region.prov.id, state.region.city.id), it => {
+        state.region.dist = it.name;
+        renderRegionPanel(); renderRegionEff(); maybeRender(); refreshRegionInsight(); closeRegionPanel();
+      }, state.region.dist || null));
     }
     // 清除按钮
     const clear = document.createElement('button');
@@ -104,7 +106,7 @@
     clear.textContent = '清除区域';
     clear.onclick = () => {
       state.region = { prov: null, city: null, dist: null };
-      renderRegionPanel(); renderRegionEff(); maybeRender();
+      renderRegionPanel(); renderRegionEff(); maybeRender(); refreshRegionInsight();
     };
     panel.appendChild(clear);
   }
@@ -112,9 +114,9 @@
   function regionLabel() {
     const r = state.region;
     if (!r.prov) return null;
-    const pv = REGIONS[r.prov].name;
-    const ct = r.city ? REGIONS[r.prov].cities[r.city].name : '';
-    const ds = (r.city && r.dist) ? REGIONS[r.prov].cities[r.city].districts[r.dist] : '';
+    const pv = r.prov.name;
+    const ct = r.city ? r.city.name : '';
+    const ds = r.dist || '';
     return [pv, ct, ds].filter(Boolean).join(' · ');
   }
 
@@ -123,10 +125,10 @@
     const label = regionLabel();
     if (!label) {
       banner.className = 'region-banner empty';
-      banner.innerHTML = '📍 未选择区域 · 当前显示<b>全国基准</b>数据（点击「选择区域」查看定制化市场规模 / 热度 / 爆品标签）';
+      banner.innerHTML = '📍 未选择区域 · 当前显示<b>全国基准</b>数据（选择省/市/区可查看定制化市场规模 / 热度 / 爆品标签）';
       return;
     }
-    const p = getRegionProf(state.region.prov);
+    const p = getRegionProf(state.region.prov.id);
     banner.className = 'region-banner';
     banner.innerHTML =
       `<div class="rb-main">📍 <b>${label}</b></div>` +
@@ -138,6 +140,81 @@
   }
 
   function closeRegionPanel() { $('#regionPanel').classList.remove('open'); $('#regionPick').textContent = '选择区域 ▾'; }
+
+  /* ---------------- 区域动态洞察（联网实时查询模拟） ---------------- */
+  // 模拟异步实时抓取：带 loading + 确定性结果（无后端前端实时生成）
+  function fetchRegionInsight(catId, l3Id, region) {
+    return new Promise(resolve => {
+      setTimeout(() => resolve(genRegionInsight(catId, l3Id, region)), 420);
+    });
+  }
+
+  function refreshRegionInsight() {
+    const box = $('#regionInsight');
+    const prov = state.region.prov;
+    const l3Id = primaryL3();
+    const label = regionLabel();
+    if (!prov) {
+      box.className = 'region-insight';
+      box.innerHTML = `<div class="ri-ph">🌐 未选择区域 — 选择省 / 市 / 区（县）后，将触发<b>联网实时查询</b>，刷新该区域的：市场热度 · 竞争指数 · 本地 TOP 品牌 · 爆品 · 本地化战略空位。</div>`;
+      return;
+    }
+    if (!l3Id) {
+      box.className = 'region-insight';
+      box.innerHTML = `<div class="ri-ph">📍 已选区域 <b>${label}</b> — 请选择一个三级行业，立即触发该区域的实时市场洞察。</div>`;
+      return;
+    }
+    const l3Name = getNode(state.category, l3Id).name;
+    box.className = 'region-insight loading';
+    box.innerHTML = `<div class="ri-loading"><span class="spinner"></span> 正在联网实时检索「${label} × ${l3Name}」市场数据（热度 / 竞品 / 爆品 / 战略空位）…</div>`;
+    fetchRegionInsight(state.category, l3Id, state.region).then(ins => {
+      // 防止竞态：若用户已切换区域/行业，丢弃过期结果
+      const stillSame = state.region.prov === prov && primaryL3() === l3Id;
+      if (!stillSame || !ins) return;
+      renderRegionInsight(ins);
+    });
+  }
+
+  function renderRegionInsight(ins) {
+    const box = $('#regionInsight');
+    box.className = 'region-insight';
+    const brands = ins.localBrands.map(b => `
+      <div class="rb-item">
+        <span class="rb-name">${b.name}${b.local ? '<i class="rb-local">本地新锐</i>' : '<i class="rb-nat">全国连锁</i>'}</span>
+        <span class="rb-share">市占 ${b.share}%</span>
+        <div class="rb-bar"><span style="width:${Math.min(100, b.share * 3)}%"></span></div>
+      </div>`).join('');
+    const products = ins.products.map(p => `
+      <div class="rp-card">
+        <div class="rp-top"><span class="rp-name">${p.name}</span><span class="rp-tag">${p.tag}</span></div>
+        <div class="rp-meta"><span>¥${p.price}</span><span class="rp-heat">热度 ${p.heat}</span></div>
+      </div>`).join('');
+    box.innerHTML = `
+      <div class="ri-head">
+        <span class="ri-title">🌐 ${ins.regionName} · ${getNode(state.category, primaryL3()).name} · 区域动态洞察</span>
+        <span class="ri-query">检索词：<code>${ins.query}</code></span>
+      </div>
+      <div class="ri-chips">
+        <span class="ri-chip heat">市场热度 <b>${ins.heat}</b>/100</span>
+        <span class="ri-chip comp">竞争指数 <b>${(ins.competition * 100).toFixed(0)}</b>/100</span>
+        <span class="ri-chip ${OCEAN_CLASS[ins.ocean]}">${OCEAN_TEXT[ins.ocean]}</span>
+        <span class="ri-chip mod">区域系数 ×${ins.sizeMod}</span>
+      </div>
+      <div class="ri-body">
+        <div class="ri-col">
+          <div class="ri-sub">🏆 该区域 TOP 品牌 / 爆品</div>
+          ${brands}
+          <div class="ri-sub">🔥 区域爆品卡</div>
+          <div class="rp-grid">${products}</div>
+        </div>
+        <div class="ri-col">
+          <div class="ri-sub">🎯 本地化战略空位（顾均辉空位表）</div>
+          <div class="ri-cell"><div class="ri-t">😣 本地人群痛点</div><div class="ri-b">${ins.localPain}</div></div>
+          <div class="ri-cell"><div class="ri-t">⚠️ 竞品本地弱点</div><div class="ri-b">${ins.localWeak}</div></div>
+          <div class="ri-gap">🎯 本地化切入点（核心结论）<div class="sg-text">${ins.localGap} <span class="gap-tag ${'gt-' + GAP_TYPES.indexOf(ins.gapType)}">${GAP_ICON[ins.gapType] || ''} ${ins.gapType}</span></div></div>
+        </div>
+      </div>`;
+  }
 
   /* ---------------- 渲染：行业级联（A / B） ---------------- */
   function renderCascader(group) {
@@ -159,6 +236,7 @@
           renderCascader(group);
           updatePath(group);
           maybeRender();
+          refreshRegionInsight();
           if (isLeaf) { panel.classList.remove('open'); const btn = $(`.btn-pick[data-group="${group}"]`); if (btn) btn.textContent = '选择行业 ▾'; }
         };
         col.appendChild(b);
@@ -173,8 +251,6 @@
   function updatePath(group) {
     const sel = state[group].sel;
     const path = sel.L3 ? getPath(state.category, sel.L3) : [];
-    const head = $(`.cascader-head[data-group="${group}"] .path-label`) ||
-                 $(`.cascader-head[data-group="${group}"]`);
     const target = $(`#path-${group}`);
     if (!target) return;
     if (!sel.L3) { target.innerHTML = '<span class="ph">未选择</span>'; return; }
@@ -187,7 +263,7 @@
   function maybeRender() {
     const aRaw = getSel(state.category, state.A.sel);
     const bRaw = getSel(state.category, state.B.sel);
-    const prov = state.region.prov;
+    const prov = state.region.prov ? state.region.prov.id : null;
     const a = aRaw ? applyRegion(aRaw, prov) : null;
     const b = bRaw ? applyRegion(bRaw, prov) : null;
 
@@ -255,7 +331,6 @@
     const N = dims.length, R = 92, cx = 130, cy = 118;
     const pt = (i, r) => [cx + r * Math.cos(-Math.PI / 2 + i * 2 * Math.PI / N), cy + r * Math.sin(-Math.PI / 2 + i * 2 * Math.PI / N)];
     let svg = `<svg viewBox="0 0 260 236" class="chart">`;
-    // 网格
     [0.25, 0.5, 0.75, 1].forEach(g => {
       svg += `<polygon points="${dims.map((_, i) => pt(i, R * g).join(',')).join(' ')}" fill="none" stroke="#eee"/>`;
     });
@@ -311,7 +386,6 @@
     max = max || 1; min = min === Infinity ? 0 : min;
     const colors = ['#3b82f6', '#ff7a59'];
     let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart">`;
-    // 轴
     svg += `<line x1="${pad}" y1="${H - pad}" x2="${W - 6}" y2="${H - pad}" stroke="#ddd"/>`;
     svg += `<text x="2" y="${H - pad + 4}" font-size="9" fill="#aaa">${fmt(min)}</text>`;
     svg += `<text x="2" y="${pad - 6}" font-size="9" fill="#aaa">${fmt(max)}</text>`;
@@ -339,7 +413,7 @@
     const s = ana.strategy;
     const path = getPath(catId, l3Id).map(n => n.name).join(' / ');
     const regionNote = state.region.prov
-      ? `<div class="strat-region">📍 区域提示：在 <b>${regionLabel()}</b> 切入「${s.gapType}」空位，可叠加标签 ${getRegionProf(state.region.prov).tags.map(t => '#' + t).join(' ')}</div>`
+      ? `<div class="strat-region">📍 区域提示：在 <b>${regionLabel()}</b> 切入「${s.gapType}」空位，可叠加标签 ${getRegionProf(state.region.prov.id).tags.map(t => '#' + t).join(' ')}</div>`
       : '';
     return `
       <div class="strat-head"><span class="badge ${role === 'A' ? 'badge-a' : 'badge-b'}">${role === 'A' ? '主对象 A' : '对比 B'}</span> ${path}
@@ -368,9 +442,8 @@
       return;
     }
     tabs.hidden = false;
-    // 默认 tab：A、B 都选中时默认进入对比，否则单对象
     let cur = (tabs.dataset.tab) || (canCompare ? 'compare' : 'single');
-    if (cur === 'compare' && !canCompare) cur = 'single'; // 仅单对象时不显示对比
+    if (cur === 'compare' && !canCompare) cur = 'single';
     tabs.innerHTML = '';
     const mkTab = (key, label) => {
       const t = document.createElement('button');
@@ -408,14 +481,12 @@
   }
 
   /* ---------------- 下钻抽屉 ---------------- */
-  function primarySel() { return state.A.sel.L3 ? 'A' : (state.B.sel.L3 ? 'B' : null); }
-
   function openDrawer() {
-    const g = primarySel(); if (!g) return;
+    const g = state.A.sel.L3 ? 'A' : (state.B.sel.L3 ? 'B' : null); if (!g) return;
     const cat = state.category;
     const l3Id = state[g].sel.L3;
     const raw = getAnalytics(cat, l3Id);
-    const ana = applyRegion(raw, state.region.prov);
+    const ana = applyRegion(raw, state.region.prov ? state.region.prov.id : null);
     const path = getPath(cat, l3Id).map(n => n.name).join(' / ');
     const ocean = raw.ocean;
     const regionChip = state.region.prov
@@ -461,7 +532,7 @@
       const panel = $('#regionPanel');
       const willShow = !panel.classList.contains('open');
       if (willShow) { renderRegionPanel(); panel.classList.add('open'); $('#regionPick').textContent = '收起 ▴'; }
-      else { panel.classList.remove('open'); $('#regionPick').textContent = '选择行业 ▾'; }
+      else { panel.classList.remove('open'); $('#regionPick').textContent = '选择区域 ▾'; }
     });
     $('#drillBtn').addEventListener('click', openDrawer);
     $('#drawerClose').addEventListener('click', closeDrawer);
@@ -478,10 +549,11 @@
     };
     setTo(state.A, '鲜果茶');
     setTo(state.B, '螺蛳粉');
-    renderCategoryTabs();
+    renderCategorySelect();
     renderRegionEff();
     ['A', 'B'].forEach(g => { renderCascader(g); updatePath(g); });
     maybeRender();
+    refreshRegionInsight();
   }
 
   function boot() {

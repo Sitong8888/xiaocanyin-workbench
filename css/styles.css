@@ -47,15 +47,20 @@ body {
 .empty { text-align: center; color: var(--ink-2); padding: 30px 16px; font-size: 13px; }
 .foot { text-align: center; color: #9aa3b2; font-size: 11px; padding: 16px; }
 
-/* ---------- 行业大类 Tab ---------- */
-.cat-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-.cat-tab {
-  flex: 0 0 auto; border: 1px solid var(--line); background: #fff; color: var(--ink);
-  border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-  display: flex; align-items: center; gap: 5px; transition: .15s; touch-action: manipulation;
+/* ---------- 行业大类下拉选择 ---------- */
+.cat-select-wrap { position: relative; }
+.cat-select-wrap::after {
+  content: "▾"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--a); font-size: 13px; pointer-events: none;
 }
-.cat-tab .cat-ic { font-size: 15px; }
-.cat-tab.active { background: var(--a); color: #fff; border-color: var(--a); box-shadow: 0 4px 12px rgba(47,107,255,.3); }
+.cat-select {
+  -webkit-appearance: none; appearance: none; width: 100%;
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 12px; padding: 12px 38px 12px 14px; font-size: 15px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation; box-shadow: var(--shadow);
+  background-image: linear-gradient(135deg,#fafcff,#fff);
+}
+.cat-select:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 3px var(--a-soft); }
 
 /* ---------- 区域选择 ---------- */
 .btn-pick {
@@ -182,6 +187,52 @@ body {
 .drawer-persona { font-size: 12px; color: #374151; background: #f8fafc; border-radius: 8px; padding: 8px 10px; }
 .drawer-gap { font-size: 12px; color: #9a3412; background: #fff7ed; border-radius: 8px; padding: 8px 10px; }
 
+/* ---------- 区域动态洞察（联网实时查询） ---------- */
+.region-insight { margin-top: 12px; border: 1px solid #e3ecff; border-radius: 14px; background: linear-gradient(135deg,#f7faff,#fbfaff); padding: 12px; }
+.region-insight.loading { background: #f6f8fc; }
+.ri-ph { font-size: 12px; color: var(--ink-2); line-height: 1.6; padding: 4px 2px; }
+.ri-ph b { color: var(--a); }
+.ri-loading { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--a); padding: 10px 2px; }
+.spinner { width: 16px; height: 16px; border: 2.5px solid var(--a-soft); border-top-color: var(--a); border-radius: 50%; animation: ri-spin .7s linear infinite; flex: 0 0 auto; }
+@keyframes ri-spin { to { transform: rotate(360deg); } }
+.ri-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.ri-title { font-size: 13px; font-weight: 800; color: #1e3a8a; }
+.ri-query { font-size: 10px; color: var(--ink-2); }
+.ri-query code { background: #eef2fb; border-radius: 5px; padding: 1px 5px; font-size: 10px; }
+.ri-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.ri-chip { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--ink-2); font-weight: 600; }
+.ri-chip b { color: var(--ink); }
+.ri-chip.heat { background: #eef5ff; border-color: #cfe0ff; color: #1d4ed8; }
+.ri-chip.comp { background: #fef2f2; border-color: #ffd0d0; color: #c0392b; }
+.ri-chip.mod { background: #f0fdf4; border-color: #c7efd3; color: #15803d; }
+.ri-chip.o-blue { background: #dcfce7; color: var(--blue); border-color: #bbf7d0; }
+.ri-chip.o-high { background: #fef3c7; color: var(--potential); border-color: #fde68a; }
+.ri-chip.o-red  { background: #fee2e2; color: var(--red); border-color: #fecaca; }
+.ri-chip.o-stable { background: #eef1f6; color: var(--stable); border-color: var(--line); }
+.ri-body { display: grid; gap: 12px; }
+.ri-col { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.ri-sub { font-size: 12px; font-weight: 700; margin: 0 0 7px; color: var(--ink); }
+.ri-sub:not(:first-child) { margin-top: 12px; }
+.rb-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; margin-bottom: 8px; }
+.rb-name { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.rb-local, .rb-nat { font-size: 9px; padding: 1px 5px; border-radius: 999px; font-style: normal; }
+.rb-local { background: #fef3c7; color: #a16207; } .rb-nat { background: #eef2fb; color: #3b5bdb; }
+.rb-share { font-size: 11px; color: var(--a); font-weight: 700; text-align: right; }
+.rb-bar { grid-column: 1 / -1; background: #eef1f6; border-radius: 5px; height: 6px; overflow: hidden; }
+.rb-bar span { display: block; height: 100%; background: var(--a); border-radius: 5px; }
+.rp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rp-card { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.rp-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.rp-name { font-size: 11px; font-weight: 600; line-height: 1.3; }
+.rp-tag { font-size: 9px; background: #ffe9e9; color: #c0392b; border-radius: 999px; padding: 1px 6px; flex: 0 0 auto; }
+.rp-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-2); margin-top: 5px; }
+.rp-heat { color: #ef4444; font-weight: 700; }
+.ri-cell { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.ri-t { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+.ri-b { font-size: 12px; color: #374151; }
+.ri-gap { margin-top: 4px; background: linear-gradient(135deg,#fff7ed,#fef2f2); border: 1px solid #fed7aa; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 700; }
+.ri-gap .sg-text { font-weight: 500; color: #9a3412; margin-top: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+
 /* ---------- 平板 / 桌面 ---------- */
 @media (min-width: 760px) {
   body { max-width: 880px; margin: 0 auto; }
@@ -190,6 +241,7 @@ body {
   .strat-grid .strat-gap, .strat-grid .strat-head { grid-column: 1 / -1; }
   .strat-head { grid-column: 1 / -1; }
   .cmp-grid { grid-template-columns: 1fr 1fr; }
+  .ri-body { grid-template-columns: 1fr 1fr; }
   .kpi-card { flex: 0 0 22%; }
   .cascader-panel.open, .region-panel.open { grid-template-columns: repeat(4, 1fr); }
 }

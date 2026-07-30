@@ -15,15 +15,19 @@
   <!-- ① 行业大类 -->
   <section class="card">
     <h2 class="sec-title">① 选择行业大类</h2>
-    <div id="catTabs" class="cat-tabs"></div>
+    <div class="cat-select-wrap">
+      <select id="catSelect" class="cat-select" aria-label="选择行业大类"></select>
+    </div>
   </section>
 
   <!-- ② 选择区域 -->
   <section class="card">
-    <h2 class="sec-title">② 选择区域 <span class="hint">（省 → 市 → 区/县）</span></h2>
+    <h2 class="sec-title">② 选择区域</h2>
     <button id="regionPick" class="btn-pick">选择区域 ▾</button>
     <div id="regionPanel" class="region-panel"></div>
     <div id="regionBanner" class="region-banner empty"></div>
+    <!-- 区域动态洞察（联网实时查询） -->
+    <div id="regionInsight" class="region-insight"></div>
   </section>
 
   <!-- ③ 分析对象选择 -->
@@ -79,7 +83,7 @@
     <div id="stratCompare"></div>
   </section>
 
-  <footer class="foot">数据模型含 8 大行业 · 94 个三级细分赛道 · 区域系数实时定制 · Demo 数据仅供演示</footer>
+  <footer class="foot">数据模型含 8 大行业 · 209 个三级细分赛道 · 全国 34 省级行政区 · 区域实时洞察 · Demo 数据仅供演示</footer>
 
   <!-- 下钻抽屉 -->
   <div id="drawerMask" class="drawer-mask"></div>
