@@ -629,8 +629,18 @@ function pick(arr, r) { return arr[Math.floor(r() * arr.length) % arr.length]; }
 function heatToNum(h) { return { '极高': 92, '高': 76, '中高': 64, '中': 52, '中低': 40, '低': 30 }[h] || 52; }
 
 /* ---------- 各品类文案库 ---------- */
+/* catering 按二级赛道分组，避免跨品类混池（如茶饮混入火锅）。
+ * 非 catering 大类保持扁平数组结构，brandBankFor 会自动兼容。 */
 const BRAND_BANKS = {
-  catering:  ['茶颜悦色', '喜茶', '蜜雪冰城', '霸王茶姬', '沪上阿姨', '瑞幸', '海底捞', '杨国福'],
+  catering: {
+    '茶饮':   ['喜茶', '霸王茶姬', '茶颜悦色', '奈雪的茶', '茶理宜世', '茉莉奶白', '沪上阿姨', '古茗', '茶百道', '蜜雪冰城'],
+    '咖啡':   ['瑞幸', '库迪', '幸运咖', 'Manner', '挪瓦咖啡', '星巴克', 'Tims'],
+    '粉面':   ['李子柒', '好欢螺', '螺霸王', '柳全', '阿宽', '马子禄', '陈香贵', '和府捞面', '五谷渔粉'],
+    '火锅':   ['海底捞', '巴奴', '湊湊', '怂火锅', '本地老火锅', '小龙坎'],
+    '烘焙':   ['泸溪河', '鲍师傅', '墨茉点心局', '好利来', '詹记', '爸爸糖'],
+    '快餐':   ['华莱士', '塔斯汀', '肯德基', '杨国福', '张亮', '米村拌饭', '南城香'],
+    '_default': ['蜜雪冰城', '瑞幸', '喜茶', '海底捞'],
+  },
   education:  ['新东方', '学而思', '美术宝', '编程猫', '番茄少儿', '金宝贝'],
   training:   ['达内', '传智播客', '黑马训练营', '三节课', '开课吧', '腾讯课堂'],
   health:     ['同仁堂', '固生堂', 'Keep', '乐刻', '超级猩猩', '壹心理'],
@@ -639,6 +649,20 @@ const BRAND_BANKS = {
   medical:    ['通策医疗', '爱尔眼科', '美年大健康', '瑞慈', '泰康', '和睦家'],
   finance:    ['金蝶', '用友', '慧算账', '平安普惠', '蚂蚁', '招商银行'],
 };
+
+/* 根据赛道名映射到正确的餐饮品牌池，杜绝跨品类（茶饮/咖啡/粉面/火锅/烘焙/快餐） */
+function brandBankFor(catId, l3name) {
+  const banks = BRAND_BANKS[catId];
+  if (!banks || Array.isArray(banks)) return banks || [];   // 非 catering 大类：直接返回数组
+  const n = l3name || '';
+  if (/咖啡|拿铁|美式|浓缩|澳白|dirty/.test(n)) return banks['咖啡'];
+  if (/茶|奶茶|柠檬|乳|萃|果味|乌龙/.test(n)) return banks['茶饮'];
+  if (/粉|面|米线|拉面|螺蛳|酸辣|拌饭|拌面/.test(n)) return banks['粉面'];
+  if (/火锅|串串|麻辣烫|椰子鸡|打边炉|猪肚鸡|冒菜|香锅/.test(n)) return banks['火锅'];
+  if (/烘焙|蛋糕|面包|麻薯|蛋黄酥|点心|泡芙|可颂|司康/.test(n)) return banks['烘焙'];
+  if (/快餐|炸鸡|汉堡|便当|盖饭|轻食|沙拉|饭团/.test(n)) return banks['快餐'];
+  return banks['_default'];
+}
 const PERSONA_BANKS = {
   catering:  ['18-30岁学生/白领，追求颜值与社交属性', '下沉市场家庭客群，重性价比与复购', '都市女性，关注健康轻食'],
   education:  ['3-12岁少儿家长，重素质与升学', '一二线中产家庭，教育投入意愿强', '焦虑型父母，怕孩子输在起跑线'],
@@ -1077,7 +1101,14 @@ function genBase(catId, l3Id, name) {
   const growth = +rnd(-2, 28).toFixed(1);              // 同比增长 %
   const competition = +rnd(0.3, 0.92).toFixed(2);      // 竞争烈度 0-1
   const penetration = +rnd(5, 65).toFixed(1);           // 渗透率 %
-  const price = Math.round(rnd(15, 580));               // 客单价（元/课程/项目基准）
+  // 客单价随机区间按品类收窄，避免细分赛道出现离谱价格（如茶饮 ¥580）
+  const PRICE_RANGE = {
+    catering: [8, 60], education: [980, 4980], training: [980, 4980],
+    health: [28, 298], service: [50, 800], design: [3000, 30000],
+    medical: [200, 15000], finance: [500, 5000],
+  };
+  const pr = PRICE_RANGE[catId] || [50, 2000];
+  const price = Math.round(rnd(pr[0], pr[1]));               // 客单价（元/课程/项目基准）
   const repurchase = +rnd(15, 78).toFixed(1);           // 复购率 %
   // 热度标签：优先采用显式 HEAT_TAG，缺失时回退数值推导
   const ocean = HEAT_TAG[name] || (growth >= 12 && competition < 0.6 ? 'blue'
@@ -1087,8 +1118,8 @@ function genBase(catId, l3Id, name) {
   let cur = (marketSize / 12) * 0.7;
   const trend = [];
   for (let i = 0; i < 12; i++) { cur *= (1 + (growth / 100) / 12 * (0.6 + 0.8 * r())); trend.push(+cur.toFixed(1)); }
-  // TOP 品牌
-  const bn = BRAND_BANKS[catId] || BRAND_BANKS.catering;
+  // TOP 品牌（按赛道正确池采样，避免跨品类）
+  const bn = brandBankFor(catId, name) || BRAND_BANKS.catering._default;
   const topBrands = [0, 1, 2].map(i => ({ name: bn[(i + Math.floor(r() * bn.length)) % bn.length], share: +(i === 0 ? rnd(12, 34) : rnd(3, 12)).toFixed(1) }));
   const persona = pick(PERSONA_BANKS[catId] || PERSONA_BANKS.catering, r);
   // 预置代表性爆品（2~3 个）
@@ -1122,6 +1153,30 @@ const CURATED = {
         weaknesses: ['产品单一、季节波动大', '缺乏品牌记忆点'],
         gap: '以「全年清爽+暖饮柠檬」破季节空位，做社区高频复购',
         gapType: '场景空位',
+      },
+    },
+    '轻乳茶/原叶鲜奶茶': {
+      marketSize: 280, growth: 18, competition: 0.84, penetration: 40, price: 19, repurchase: 47, ocean: 'red',
+      topBrands: [{ name: '霸王茶姬', share: 20.1 }, { name: '喜茶', share: 17.4 }, { name: '茶颜悦色', share: 12.8 }],
+      persona: '18-32岁白领/学生，重原叶品质与清爽口感，健康化趋势明显',
+      strategy: {
+        competitors: [{ name: '霸王茶姬/喜茶', mind: '以「原叶鲜奶茶+国风符号」占据年轻人品质奶茶心智' }],
+        painPoints: ['同质化严重、喝不出差异', '奶基底品质参差、植脂末顾虑', '排队久、出杯慢'],
+        weaknesses: ['为标准化牺牲在地风味个性', '原料升级推高成本、利润承压', '价格战挤压中端'],
+        gap: '以「0奶精真原叶+在地茶基底限定」切入健康清爽空位，避开纯颜值红海',
+        gapType: '特性空位',
+      },
+    },
+    '纯茶/功夫茶': {
+      marketSize: 62, growth: 13, competition: 0.55, penetration: 16, price: 28, repurchase: 55, ocean: 'stable',
+      topBrands: [{ name: '煮葉', share: 11.2 }, { name: '茶颜悦色·知乎茶也', share: 8.4 }, { name: '一念草木中', share: 6.9 }],
+      persona: '养生/文化客群，重原叶品质与慢场景，复购靠习惯养成',
+      strategy: {
+        competitors: [{ name: '原叶茶品牌', mind: '以「真茶叶+慢泡场景」占据健康饮茶心智' }],
+        painPoints: ['年轻客群嫌繁琐、门槛高', '风味认知弱、难复购', '门店体验重、扩张慢'],
+        weaknesses: ['标准化难、依赖茶艺师', '客单低、坪效承压'],
+        gap: '以「冷萃原叶+即饮化包装」破年轻化空位，做轻养生高频复购',
+        gapType: '人群空位',
       },
     },
     '螺蛳粉': {
@@ -1487,8 +1542,8 @@ function genRegionInsight(catId, l3Id, region) {
   const ocean = heat >= 70 && competition < 0.6 ? 'blue'
               : heat >= 70 && competition >= 0.6 ? 'high'
               : heat < 45 && competition >= 0.7 ? 'red' : 'stable';
-  // 本地 TOP 品牌（2 个本地新锐 + 1-2 个全国性连锁）
-  const bn = BRAND_BANKS[catId] || BRAND_BANKS.catering;
+  // 本地 TOP 品牌（2 个本地新锐 + 1-2 个全国性连锁，按赛道正确池采样）
+  const bn = brandBankFor(catId, l3name) || BRAND_BANKS.catering._default;
   const suffix = LOCAL_SUFFIX[catId] || LOCAL_SUFFIX.catering;
   const sn = shortName(rname) || '本地';
   const localBrands = [];
@@ -1501,7 +1556,7 @@ function genRegionInsight(catId, l3Id, region) {
   if (base.hitProducts && base.hitProducts.length) {
     products = base.hitProducts.slice(0, 3).map(h => ({
       name: (rname.slice(0, 4) || '本地') + '·' + h.name,
-      price: Math.max(1, Math.round(h.price * rnd(0.85, 1.15))),
+      price: Math.max(1, Math.round((base.price || h.price) * rnd(0.85, 1.15))),
       tag: h.tag || pick(['热销', '新品', '爆款'], r),
       heat: Math.round(rnd(62, 99)),
     }));

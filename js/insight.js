@@ -85,8 +85,8 @@ function closeRegionPanel() { $('#regionPanel').classList.remove('open'); $('#re
 function renderMockBrands(ins) {
   return ins.localBrands.map(b => `
     <div class="rb-item">
-      <span class="rb-name">${esc(b.name)}${b.local ? '<i class="rb-local">本地新锐</i>' : '<i class="rb-nat">全国连锁</i>'}</span>
-      <span class="rb-share">市占 ${b.share}%</span>
+      <span class="rb-name">${esc(b.name)}${b.local ? '<i class="rb-local">本地新锐·模拟</i>' : '<i class="rb-nat">全国连锁·模拟</i>'}</span>
+      <span class="rb-share">基准占比 ${b.share}%</span>
       <div class="rb-bar"><span style="width:${Math.min(100, b.share * 3)}%"></span></div>
     </div>`).join('');
 }
