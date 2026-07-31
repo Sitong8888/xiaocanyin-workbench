@@ -43,6 +43,8 @@ function normLiveBrand(b) {
   let avgPrice = parseFloat(b.avgPrice); if (isNaN(avgPrice)) avgPrice = 0;
   return {
     brandName: b.brandName || b.name || '未知品牌',
+    address: String(b.address || '').trim(),           // 高德实采真实地址（仅 isRealAmap=true 时有效）
+    positioning: String(b.positioning || '').trim(),  // 智谱战略定位建议
     hotItem: b.hotItem || b.signboard || '',
     avgPrice: avgPrice,
     rating: rating,
@@ -67,11 +69,12 @@ async function fetchLiveBrands(query, externalCtrl) {
     const res = await fetch(url, { signal: ctrl.signal, headers });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    const isRealAmap = !!data.isRealAmap;   // 高德 POI 实采标志（true=100%真实门店）
     const arr = Array.isArray(data) ? data : (data.brands || data.data || data.results || []);
-    if (!Array.isArray(arr) || !arr.length) return null;
+    if (!Array.isArray(arr) || !arr.length) return { isRealAmap, brands: [] };
     const clean = arr.filter(b => !isFakeBrand(b)).map(normLiveBrand).slice(0, 8);
-    if (!clean.length) return null;         // 全是假数据 → 触发降级，不展示脏数据
-    return clean;
+    if (!clean.length) return { isRealAmap, brands: [] };   // 全是假数据 → 触发降级，不展示脏数据
+    return { isRealAmap, brands: clean };
   } catch {
     return null;                          // 网络 / 解析失败 → 触发降级
   } finally {

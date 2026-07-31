@@ -97,18 +97,27 @@ function renderMockProducts(ins) {
       <div class="rp-meta"><span>¥${p.price}</span><span class="rp-heat">热度 ${p.heat}</span></div>
     </div>`).join('');
 }
-function renderLiveBrands(live) {
+function renderLiveBrands(live, isRealAmap) {
   return live.map(b => {
     const dy = b.douyinRank
       ? `<i class="rb-douyin">${b.douyinRank.indexOf('🎵') === 0 ? '' : '🎵 '}${esc(b.douyinRank)}</i>`
       : '';
+    const badge = isRealAmap ? `<i class="amap-badge">📍 高德地图实采</i>` : '';
+    const addr = isRealAmap && b.address
+      ? `<div class="brand-address">📍 ${esc(b.address)}</div>`
+      : '';
+    const pos = (isRealAmap && b.positioning)
+      ? `<div class="rb-pos">🎯 ${esc(b.positioning)}</div>`
+      : '';
     return `
     <div class="rb-item live">
       <div class="rb-top">
-        <span class="rb-name">${esc(b.brandName)} <i class="rb-tag ${tagClass(b.tag)}">${esc(b.tag)}</i>${dy}</span>
+        <span class="rb-name">${esc(b.brandName)} <i class="rb-tag ${tagClass(b.tag)}">${esc(b.tag)}</i>${badge}${dy}</span>
         <span class="rb-rating">★ ${b.rating}</span>
       </div>
       <div class="rb-meta">招牌爆品：${esc(b.hotItem) || '—'} ｜ 人均 ¥${b.avgPrice}</div>
+      ${addr}
+      ${pos}
     </div>`;
   }).join('');
 }
@@ -118,13 +127,22 @@ function regionInsightShell(ins, opts) {
   const label = regionLabel() || '全国';
   let brandsInner, srcLabel;
   if (opts.loading) {
-    brandsInner = `<div class="ri-loading"><span class="spinner"></span> 正在实时抓取「${esc(label)}」美团 / 大众点评 / 抖音数据…</div>`;
+    brandsInner = `<div class="ri-loading"><span class="spinner"></span> 正在实时抓取「${esc(label)}」高德地图真实门店…</div>`;
     srcLabel = '<span class="ri-src loading">● 实时抓取中</span>';
   } else if (opts.live) {
-    brandsInner = opts.live.length
-      ? renderLiveBrands(opts.live)
-      : (renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`);
-    srcLabel = '<span class="ri-src live">● 实时美团/点评/抖音</span>';
+    if (opts.live.length) {
+      brandsInner = renderLiveBrands(opts.live, opts.isRealAmap);
+      srcLabel = opts.isRealAmap
+        ? '<span class="ri-src amap">📍 高德 POI 实采 · 真实门店</span>'
+        : '<span class="ri-src live">● 实时检索</span>';
+    } else {
+      brandsInner = (renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`);
+      srcLabel = opts.isRealAmap ? '<span class="ri-src amap">📍 高德 POI 实采</span>' : '<span class="ri-src live">● 实时检索</span>';
+    }
+  } else if (opts.amapEmpty) {
+    brandsInner = `<div class="ri-fallback amap">ℹ️ 「${esc(label)}」暂未检索到可验证的高德门店，已为您提供<b>行业基准分析模型</b></div>` +
+      renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
+    srcLabel = '<span class="ri-src mock">○ 行业基准分析模型（高德无匹配）</span>';
   } else if (opts.fallback) {
     brandsInner = `<div class="ri-fallback">ℹ️ 「${esc(label)}」暂未检索到可验证的真实榜单，已为您提供<b>行业基准分析模型</b></div>` +
       renderMockBrands(ins) + `<div class="ri-sub">🔥 区域爆品卡</div><div class="rp-grid">${renderMockProducts(ins)}</div>`;
@@ -199,7 +217,11 @@ function refreshRegionInsight() {
       box.classList.remove('loading');
     };
     fetchLiveBrands(query, ctrl)
-      .then(live => settle(live ? { live } : { fallback: true }))
+      .then(res => {
+        if (!res) return settle({ fallback: true });
+        if (res.isRealAmap === false && (!res.brands || !res.brands.length)) return settle({ amapEmpty: true });
+        return settle({ live: res.brands || [], isRealAmap: !!res.isRealAmap });
+      })
       .catch(() => settle({ fallback: true }));
   } else {
     box.className = 'region-insight';

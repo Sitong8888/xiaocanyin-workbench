@@ -23,7 +23,7 @@ const APP_GLOBALS = {
   GAP_TYPES: 'readonly', GAP_ICON: 'readonly',
   getTree: 'readonly', getNode: 'readonly', getChildren: 'readonly', getAnalytics: 'readonly',
   getPath: 'readonly', findL3Id: 'readonly', getRegionProf: 'readonly', applyRegion: 'readonly',
-  getProvinces: 'readonly', getCities: 'readonly', getDistricts: 'readonly',
+  getProvinces: 'readonly', getCities: 'readonly', getDistricts: 'readonly', resolveRegionByNames: 'readonly', normRegionName: 'readonly',
   genRegionInsight: 'readonly', regionNameOf: 'readonly',
   module: 'writable', require: 'readonly', process: 'readonly',
 };

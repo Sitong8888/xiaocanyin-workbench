@@ -1512,6 +1512,42 @@ function getDistricts(provId, cityId) {
   return c ? c.districts.map((d, i) => ({ id: 'd' + i, name: d })) : [];
 }
 
+/* ---------- 由高德逆地理编码返回的 省/市/区 名 → 解析为本工作台 region 模型 ----------
+ * 高德返回含后缀（"海南省"/"海口市"/"龙华区"），本库名也含后缀，做归一匹配以兼容各种写法。 */
+function normRegionName(n) {
+  return (n || '').replace(/(省|市|自治区|特别行政区|壮族|回族|维吾尔|苗族|彝族|藏族|土家族|侗族|布依族|哈萨克|自治州|地区|盟|区|县|特区|新区)$/g, '').trim();
+}
+function resolveRegionByNames(provName, cityName, distName) {
+  if (!provName) return { prov: null, city: null, dist: null };
+  const pn = normRegionName(provName);
+  const prov = CHINA.find(p => p.name === provName || normRegionName(p.name) === pn ||
+    p.name.includes(pn) || pn.includes(normRegionName(p.name)));
+  if (!prov) return { prov: null, city: null, dist: null };
+  const provObj = { id: prov.id, name: prov.name };
+  const cityList = getCities(prov.id);
+  let city = null;
+  if (cityName && normRegionName(cityName) !== pn) {
+    const cn = normRegionName(cityName);
+    city = cityList.find(c => c.name === cityName || normRegionName(c.name) === cn ||
+      c.name.includes(cn) || cn.includes(normRegionName(c.name))) || null;
+  }
+  if (!city && distName) {       // 直辖市 / city 缺失：用 district 反查所属市
+    for (const c of cityList) {
+      const ds = getDistricts(prov.id, c.id);
+      if (ds.some(d => d.name === distName || normRegionName(d.name) === normRegionName(distName))) { city = c; break; }
+    }
+  }
+  if (!city) city = cityList[0] || null;   // 兜底：直辖市自身
+  let dist = null;
+  if (distName && city) {
+    const dn = normRegionName(distName);
+    const dm = getDistricts(prov.id, city.id).find(d => d.name === distName || normRegionName(d.name) === dn ||
+      d.name.includes(dn) || dn.includes(normRegionName(d.name)));
+    if (dm) dist = dm.name;
+  }
+  return { prov: provObj, city: city, dist: dist };
+}
+
 /* ---------- 区域名解析 ---------- */
 function regionNameOf(region) {
   if (!region) return '';

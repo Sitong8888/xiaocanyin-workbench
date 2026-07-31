@@ -17,9 +17,16 @@
  *          提取结果再过两道防线：假名正则清洗 + 锚定校验（店名必须出现在快照原文中）。
  *
  *  环境变量（wrangler secret put）：
- *    ZHIPU_API_KEY    必填，智谱 API Key（搜索兜底 + 提取）
- *    SEARCH_PROVIDER  选填，外部搜索商：tavily | bocha | serpapi
+ *    AMAP_KEY         必填，高德 Web 服务 Key —— 主路径用其 POI 搜索 API 实采 100% 真实门店
+ *    ZHIPU_API_KEY    必填，智谱 API Key —— 仅对高德真实门店做特劳特×顾均辉定位分析
+ *    SEARCH_PROVIDER  选填，外部搜索商：tavily | bocha | serpapi（仅当未配 AMAP_KEY 时作兜底）
  *    SEARCH_API_KEY   选填，外部搜索商的 API Key
+ *
+ *  新架构（数据真实性优先）：
+ *    Step 1  高德 POI 实采：restapi.amap.com/v3/place/text，取真实店名/地址/评分/均价
+ *    Step 2  智谱分析：把真实门店列表作为唯一事实喂给 GLM-4，铁律保持 brandName/address
+ *            不变，只补充招牌爆品与战略定位建议（杜绝拼凑幻觉）
+ *    退化：未配 AMAP_KEY → 走旧「两步搜索+抽取」管线；高德 0 家 → isRealAmap:false
  * ===================================================================== */
 
 const ZHIPU_CHAT_URL   = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
@@ -106,7 +113,9 @@ export function buildSearchQuery(rawQuery) {
   const coreCat = l3 || otherToks.join(" ");
 
   const searchQuery = `${region} ${coreCat} 美团 大众点评 热门`.replace(/\s+/g, " ").trim();
-  return { region: region.replace(/\s+/g, ""), l3, catPath, searchQuery };
+  const cityTok = regionToks.find(t => /[市]$/.test(t));
+  const distTok = regionToks.find(t => /[区县]$/.test(t));
+  return { region: region.replace(/\s+/g, ""), l3, catPath, searchQuery, city: cityTok || "", district: distTok || "" };
 }
 
 /* ---------- Step 1b：外部专业搜索 API（Tavily / 博查 / SerpAPI） ---------- */
@@ -161,6 +170,138 @@ async function searchZhipu(zhipuKey, q) {
     if (!Array.isArray(arr) || !arr.length) return null;
     return arr.map(r => ({ title: r.title || "", content: r.content || "", url: r.link || "" }));
   } catch { return null; }
+}
+
+/* ===================== 新主路径：高德 POI 实采 + 智谱定位分析 ===================== */
+const AMAP_PLACE_URL = "https://restapi.amap.com/v3/place/text";
+const AMAP_REGEO_URL = "https://restapi.amap.com/v3/geocode/regeo";
+
+/* ---------- Step 1：高德 POI 搜索（100% 真实注册营业门店） ----------
+ * 解析高德返回 pois：真实店名 name / 真实地址 address / 高德评分 biz_ext.rating / 高德均价 biz_ext.cost */
+async function searchAmapPoi(amapKey, keywords, city) {
+  const params = new URLSearchParams({
+    key: amapKey,
+    keywords: String(keywords || ""),
+    city: String(city || ""),
+    offset: "10",
+    extensions: "all",
+    output: "JSON",
+  });
+  const u = AMAP_PLACE_URL + "?" + params.toString();
+  let j;
+  try {
+    const res = await fetch(u);
+    if (!res.ok) return null;
+    j = await res.json();
+  } catch { return null; }
+  if (j.status !== "1" || !Array.isArray(j.pois)) return [];
+  return j.pois.map(p => {
+    const ext = p.biz_ext || {};
+    const rating = ext.rating ? parseFloat(ext.rating) : 0;
+    const cost = ext.cost ? parseFloat(String(ext.cost).replace(/[^\d.]/g, "")) : 0;
+    return {
+      brandName: String(p.name || "").trim(),
+      address: String(p.address || "").trim(),
+      city: String(p.cityname || "").trim(),
+      district: String(p.adname || "").trim(),
+      rating: isNaN(rating) ? 0 : rating,
+      cost: isNaN(cost) ? 0 : cost,
+      type: String(p.type || "").trim(),
+    };
+  }).filter(b => b.brandName);
+}
+
+/* ---------- Step 2：智谱 GLM-4 事实绑定 + 特劳特定位分析 ----------
+ * 高德真实门店列表即唯一事实；智谱只补充招牌爆品与定位建议，严禁改店名/地址 */
+async function analyzeWithZhipu(zhipuKey, pois, l3, region, catPath) {
+  const ctx = pois.map((p, i) =>
+    `${i + 1}. brandName="${p.brandName}" | address="${p.address}" | 高德人均(元)=${p.cost || "未知"} | 高德评分=${p.rating || "未知"}`
+  ).join("\n");
+  const systemPrompt = `你是一个商业战略分析师（特劳特《定位》× 顾均辉空位理论）。
+以下是高德地图 API 100% 真实检索到的本地门店列表（含真实店名 brandName 与真实地址 address）：
+${ctx}
+
+【铁律】
+1. 你必须严格保持每条记录的 brandName 与 address 原样不变，绝对禁止任何拼凑、修改、翻译或虚构！所有分析结论只能基于这些真实门店。
+2. 为每个真实门店配置其典型的招牌爆品（hotItem，1 个该品牌真实常见单品；若不确定写"招牌产品"）。
+3. 结合特劳特×顾均辉定位理论，为每条门店给出一句战略定位建议（positioning，≤24 字，指出可切入的心智空位或对立面打法）。
+4. tag 从 [红海, 蓝海, 高潜, 平稳] 中选一个（依据该品类在当地的竞争激烈度判断）。
+5. avgPrice 必须使用上面给出的"高德人均(元)"真实数字（字符串，如"19"），严禁编造；若未知填"0"。
+6. 严禁输出任何未在门店列表中出现的店名。
+
+【输出】只返回纯 JSON 对象，禁止 markdown 代码块与任何解释：
+{"brands":[{"brandName":"原样真实店名","address":"原样真实地址","hotItem":"招牌爆品","avgPrice":"19","rating":4.7,"tag":"高潜","positioning":"一句战略定位建议"}]}`;
+  const userPrompt = `目标赛道：${l3 || "本地生活"}（背景分类：${catPath || "无"}）｜区域：${region || "用户指定"}。
+请基于上面的真实门店列表，输出战略空位分析 JSON。`;
+  try {
+    const res = await fetch(ZHIPU_CHAT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${zhipuKey}` },
+      body: JSON.stringify({
+        model: "glm-4-flash",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const rawContent = j.choices?.[0]?.message?.content || "";
+    const m = rawContent.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    return JSON.parse(m[0]);
+  } catch { return null; }
+}
+
+/* ---------- 合并：高德真值优先，智谱仅补充分析字段 ---------- */
+function mergeAmapBrands(pois, zhipu) {
+  const map = {};
+  if (zhipu && Array.isArray(zhipu.brands)) {
+    for (const b of zhipu.brands) {
+      if (b && b.brandName) map[String(b.brandName).trim()] = b;
+    }
+  }
+  return pois.slice(0, 10).map(p => {
+    const z = map[p.brandName];
+    let tag = z && z.tag ? String(z.tag).trim() : "平稳";
+    if (!["红海", "蓝海", "高潜", "平稳"].includes(tag)) tag = "平稳";
+    const avgPrice = p.cost > 0 ? p.cost : (z && parseFloat(z.avgPrice) > 0 ? parseFloat(z.avgPrice) : 0);
+    return {
+      brandName: p.brandName,
+      address: p.address,
+      rating: p.rating,
+      avgPrice: avgPrice,
+      hotItem: z && z.hotItem ? String(z.hotItem) : "—",
+      tag: tag,
+      positioning: z && z.positioning ? String(z.positioning) : "",
+    };
+  });
+}
+
+/* ---------- /geo：浏览器定位 → 经纬度 → 高德逆地理编码（AMAP_KEY 仅存于后端） ---------- */
+async function reverseGeocode(env, lng, lat) {
+  const key = env.AMAP_KEY;
+  if (!key) return { error: "AMAP_KEY Missing" };
+  const u = `${AMAP_REGEO_URL}?key=${encodeURIComponent(key)}&location=${encodeURIComponent(lng + "," + lat)}&extensions=base&output=JSON`;
+  try {
+    const res = await fetch(u);
+    if (!res.ok) return { error: "amap_upstream", status: res.status };
+    const j = await res.json();
+    if (j.status !== "1" || !j.regeocode) return { error: "amap_error", info: j.info || "" };
+    const ac = j.regeocode.addressComponent || {};
+    const cityRaw = Array.isArray(ac.city) ? ac.city[0] : ac.city;
+    return {
+      province: ac.province || "",
+      city: cityRaw || "",
+      district: ac.district || "",
+      adcode: ac.adcode || "",
+      lng, lat,
+    };
+  } catch (e) {
+    return { error: "amap_exception", message: String(e && e.message || e) };
+  }
 }
 
 /* ---------- 快照 → 文本上下文 ---------- */
@@ -255,6 +396,22 @@ export default {
         return new Response(null, { headers: corsHeaders, status: 204 });
       }
 
+      /* ---------- /geo：浏览器定位(经纬度) → 高德逆地理编码 → 省/市/区 ---------- */
+      if (url.pathname.endsWith("/geo") && request.method === "GET") {
+        const lat = parseFloat(url.searchParams.get("lat"));
+        const lng = parseFloat(url.searchParams.get("lng"));
+        if (isNaN(lat) || isNaN(lng)) {
+          return new Response(JSON.stringify({ error: "invalid coords" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400,
+          });
+        }
+        const geo = await reverseGeocode(env, lng, lat);   // 高德逆地理编码在服务端完成，AMAP_KEY 不暴露给前端
+        const status = geo.error && geo.error !== "AMAP_KEY Missing" ? 200 : 200;
+        return new Response(JSON.stringify(geo), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, status,
+        });
+      }
+
       const zhipuKey = env.ZHIPU_API_KEY;
       if (!zhipuKey) return json({ error: "ZHIPU_API_KEY Missing", brands: [] });
 
@@ -268,9 +425,9 @@ export default {
       }
 
       const rawQuery = url.searchParams.get("q") || "";
-      const { region, l3, catPath, searchQuery } = buildSearchQuery(rawQuery);
+      const { region, l3, catPath, searchQuery, city, district } = buildSearchQuery(rawQuery);
 
-      /* ---------- KV 缓存：命中直接返回，不触碰博查/智谱付费 API ---------- */
+      /* ---------- KV 缓存：命中直接返回，不触碰高德/智谱付费 API ---------- */
       const cacheKey = cacheKeyOf(searchQuery);
       const noCache = url.searchParams.get("nocache") === "1";
       if (!noCache) {
@@ -281,7 +438,39 @@ export default {
         }
       }
 
-      /* ========== Step 1：获取网页快照 ========== */
+      /* ========== 主路径 Step 1+2：高德 POI 实采真实门店 → 智谱定位分析 ========== */
+      if (env.AMAP_KEY) {
+        // keywords 取三级细分品类（去 "/·" 等分隔，取首个词，如「轻乳茶/原叶鲜奶茶」→「轻乳茶」）
+        const keywords = String(l3 || "").split(/[/\／·]/)[0].trim() || l3;
+        const cityParam = city || region;   // AMap city 参数：优先市级名，否则退化为区域串
+        const pois = await searchAmapPoi(env.AMAP_KEY, keywords, cityParam);
+        if (pois && pois.length) {
+          const zhipu = await analyzeWithZhipu(zhipuKey, pois, l3, region, catPath);
+          const brands = mergeAmapBrands(pois, zhipu);
+          const payload = {
+            isRealAmap: true,
+            brands,
+            _meta: {
+              pipeline: "amap-poi+zhipu",
+              model: "glm-4-flash",
+              poiCount: pois.length,
+              analyzed: !!zhipu,
+              keywords, city: cityParam, district, searchQuery,
+            },
+          };
+          await writeCache(env, cacheKey, payload, CACHE_TTL_HIT);
+          return json(payload);
+        }
+        // 高德 0 家 → 明确告知前端走行业基准兜底
+        const emptyPayload = {
+          isRealAmap: false, brands: [],
+          _meta: { pipeline: "amap-poi+zhipu", poiCount: 0, reason: "amap_no_poi", keywords, city: cityParam, district, searchQuery },
+        };
+        await writeCache(env, cacheKey, emptyPayload, CACHE_TTL_EMPTY);
+        return json(emptyPayload);
+      }
+
+      /* ========== 兜底 Step 1：获取网页快照（仅当未配置 AMAP_KEY） ========== */
       let snippets = null;
       let provider = "zhipu_web_search";
       if (env.SEARCH_API_KEY && env.SEARCH_PROVIDER) {
@@ -293,7 +482,7 @@ export default {
 
       if (!snippets || !snippets.length) {
         // 搜索层拿不到任何快照 → 明确返回空，前端展示行业基准分析模型
-        const emptyPayload = { brands: [], _meta: { pipeline: "two-step", provider, snippetCount: 0, reason: "no_snippets", searchQuery } };
+        const emptyPayload = { isRealAmap: false, brands: [], _meta: { pipeline: "two-step", provider, snippetCount: 0, reason: "no_snippets", searchQuery } };
         await writeCache(env, cacheKey, emptyPayload, CACHE_TTL_EMPTY);   // 短缓存：防同一空查询反复烧搜索额度
         return json(emptyPayload);
       }
@@ -332,6 +521,7 @@ export default {
       const g = groundFilter(resultData && resultData.brands, snippetText);
 
       const payload = {
+        isRealAmap: false,
         brands: g.brands.slice(0, 8),
         _meta: {
           pipeline: "two-step",
